@@ -1,0 +1,135 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "schedule": [
+    "before 4am on monday"
+  ],
+  "timezone": "UTC",
+  "baseBranches": [
+    "main-nxp"
+  ],
+  "labels": [
+    "dependencies"
+  ],
+  "separateMinorPatch": true,
+  "prConcurrentLimit": 10,
+  "prHourlyLimit": 5,
+  "branchConcurrentLimit": 15,
+  "cargo": {
+    "enabled": true,
+    "rangeStrategy": "bump"
+  },
+  "rust": {
+    "enabled": true
+  },
+  "postUpdateOptions": [
+    "cargoUpdateLockfile"
+  ],
+  "packageRules": [
+    {
+      "description": "Group non-major Rust crate updates",
+      "matchDatasources": [
+        "crate"
+      ],
+      "matchUpdateTypes": [
+        "patch",
+        "minor"
+      ],
+      "groupName": "Rust dependencies (non-major)",
+      "automerge": true,
+      "automergeType": "pr",
+      "automergeStrategy": "squash",
+      "stabilityDays": 3,
+      "labels": [
+        "rust-dependency-update"
+      ],
+      "schedule": [
+        "before 4am on monday"
+      ]
+    },
+    {
+      "description": "Major Rust crate updates require manual review",
+      "matchDatasources": [
+        "crate"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false,
+      "labels": [
+        "rust-dependency-update",
+        "major-update"
+      ],
+      "schedule": [
+        "before 4am on monday"
+      ]
+    },
+    {
+      "description": "Auto-merge dev dependencies for patch and minor updates",
+      "matchDepTypes": [
+        "dev-dependencies"
+      ],
+      "automerge": true,
+      "automergeType": "pr",
+      "automergeStrategy": "squash",
+      "matchUpdateTypes": [
+        "patch",
+        "minor"
+      ],
+      "stabilityDays": 1
+    },
+    {
+      "description": "Group serde ecosystem updates",
+      "matchPackagePatterns": [
+        "^serde",
+        "serde_"
+      ],
+      "groupName": "serde ecosystem",
+      "schedule": [
+        "before 4am on monday"
+      ]
+    },
+    {
+      "description": "Group tokio ecosystem updates",
+      "matchPackagePatterns": [
+        "^tokio"
+      ],
+      "groupName": "tokio ecosystem",
+      "schedule": [
+        "before 4am on monday"
+      ]
+    },
+    {
+      "description": "Pin rust-version in workspace",
+      "matchFiles": [
+        "Cargo.toml"
+      ],
+      "matchPackageNames": [
+        "rust"
+      ],
+      "enabled": false
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": [
+      "security"
+    ],
+    "automerge": false,
+    "schedule": [
+      "at any time"
+    ]
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "before 3am on the first day of the month"
+    ],
+    "automerge": true,
+    "automergeType": "pr",
+    "commitMessageAction": "Update",
+    "commitMessageTopic": "Cargo.lock"
+  }
+}
