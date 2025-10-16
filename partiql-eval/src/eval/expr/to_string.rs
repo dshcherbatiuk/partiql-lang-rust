@@ -62,8 +62,9 @@ fn format_datetime(dt: &DateTime, format: &str) -> String {
 
     match dt {
         DateTime::Date(d) => {
-            let chrono_date = NaiveDate::from_ymd_opt(d.year(), u8::from(d.month()) as u32, d.day() as u32)
-                .unwrap();
+            let chrono_date =
+                NaiveDate::from_ymd_opt(d.year(), u8::from(d.month()) as u32, d.day() as u32)
+                    .unwrap();
             chrono_date.format(&converted_format).to_string()
         }
         DateTime::Time(t) => {
@@ -89,15 +90,29 @@ fn format_datetime(dt: &DateTime, format: &str) -> String {
         }
         DateTime::Timestamp(ts) => {
             let chrono_dt = NaiveDateTime::new(
-                NaiveDate::from_ymd_opt(ts.year(), u8::from(ts.month()) as u32, ts.day() as u32).unwrap(),
-                NaiveTime::from_hms_nano_opt(ts.hour() as u32, ts.minute() as u32, ts.second() as u32, ts.nanosecond()).unwrap(),
+                NaiveDate::from_ymd_opt(ts.year(), u8::from(ts.month()) as u32, ts.day() as u32)
+                    .unwrap(),
+                NaiveTime::from_hms_nano_opt(
+                    ts.hour() as u32,
+                    ts.minute() as u32,
+                    ts.second() as u32,
+                    ts.nanosecond(),
+                )
+                .unwrap(),
             );
             chrono_dt.format(&converted_format).to_string()
         }
         DateTime::TimestampWithTz(ts) => {
             let chrono_dt = NaiveDateTime::new(
-                NaiveDate::from_ymd_opt(ts.year(), u8::from(ts.month()) as u32, ts.day() as u32).unwrap(),
-                NaiveTime::from_hms_nano_opt(ts.hour() as u32, ts.minute() as u32, ts.second() as u32, ts.nanosecond()).unwrap(),
+                NaiveDate::from_ymd_opt(ts.year(), u8::from(ts.month()) as u32, ts.day() as u32)
+                    .unwrap(),
+                NaiveTime::from_hms_nano_opt(
+                    ts.hour() as u32,
+                    ts.minute() as u32,
+                    ts.second() as u32,
+                    ts.nanosecond(),
+                )
+                .unwrap(),
             );
             chrono_dt.format(&converted_format).to_string()
         }
@@ -228,11 +243,11 @@ fn convert_partiql_pattern_to_chrono(pattern: &str) -> String {
 mod tests {
     use super::*;
     use crate::env::basic::MapBindings;
-    use crate::eval::BasicContext;
     use crate::eval::expr::EvalLitExpr;
+    use crate::eval::BasicContext;
     use partiql_catalog::context::SystemContext;
-    use partiql_value::{DateTime, Tuple};
     use partiql_value::datum::DatumTupleRef;
+    use partiql_value::{DateTime, Tuple};
 
     #[test]
     fn test_to_string_with_timestamp() {

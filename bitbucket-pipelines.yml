@@ -1,0 +1,149 @@
+image:
+  name: us-west1-docker.pkg.dev/nextplane-common/images/debian-bitbucket-pipeline-java21:2.0.0-377-g4277db572
+  username: "_json_key_base64"
+  password: '$GCP_AR_SA_KEY'
+
+# https://support.atlassian.com/bitbucket-cloud/docs/global-options/#Docker
+options:
+  size: 8x
+  runtime:
+    cloud:
+      version: "3"
+
+# https://support.atlassian.com/bitbucket-cloud/docs/git-clone-behavior/
+clone:
+  depth: 500
+
+definitions:
+  caches:
+    cargo-registry: ~/.cargo/registry
+    cargo-git: ~/.cargo/git
+    cargo-target: target
+
+pipelines:
+  default:
+    - step:
+        name: Fetch Cargo Dependencies
+        caches:
+          - cargo-registry
+          - cargo-git
+        script:
+          - |
+            echo "Cargo cache info:"
+            du -sh ~/.cargo/registry ~/.cargo/git 2>/dev/null || echo "Cache directories not found (first run)"
+          - cargo fetch
+          - echo "✓ Dependencies fetched"
+
+    - parallel:
+        - step:
+            name: Build aarch64 Linux
+            caches:
+              - cargo-registry
+              - cargo-git
+              - cargo-target
+            script:
+              # Install aarch64 cross-compilation tools
+              - apt-get update
+              - apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu binutils-aarch64-linux-gnu || apt-get install -y crossbuild-essential-arm64
+              - rustup target add aarch64-unknown-linux-gnu
+              - export CARGO_INCREMENTAL=1
+              - export CARGO_BUILD_JOBS=8
+              - export CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc
+              - export CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++
+              - export AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar
+              - export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
+              - export PKG_CONFIG_ALLOW_CROSS=1
+              - cp .cargo/config-ci.toml .cargo/config.toml
+              - cargo build --release --target aarch64-unknown-linux-gnu
+              - mkdir -p bin/aarch64-unknown-linux-gnu
+              - cp target/aarch64-unknown-linux-gnu/release/libfde_jni.so bin/aarch64-unknown-linux-gnu/ || true
+              - cp target/aarch64-unknown-linux-gnu/release/fde bin/aarch64-unknown-linux-gnu/ || true
+              - echo "✓ aarch64 Linux build complete"
+            artifacts:
+              - bin/aarch64-unknown-linux-gnu/**
+              - target/aarch64-unknown-linux-gnu/release/fde
+              - target/aarch64-unknown-linux-gnu/release/libfde_jni.*
+
+        - step:
+            name: Build x86_64 Linux
+            caches:
+              - cargo-registry
+              - cargo-git
+              - cargo-target
+            script:
+              # Install basic build tools
+              - apt-get update
+              - apt-get install -y gcc g++ libssl-dev pkg-config
+              - rustup target add x86_64-unknown-linux-gnu
+              - export CARGO_INCREMENTAL=1
+              - export CARGO_BUILD_JOBS=8
+              - export CC_x86_64_unknown_linux_gnu=gcc
+              - export CXX_x86_64_unknown_linux_gnu=g++
+              - export AR_x86_64_unknown_linux_gnu=ar
+              - export PKG_CONFIG_ALLOW_CROSS=1
+              - cp .cargo/config-ci.toml .cargo/config.toml
+              - cargo build --release --target x86_64-unknown-linux-gnu
+              - mkdir -p bin/x86_64-unknown-linux-gnu
+              - cp target/x86_64-unknown-linux-gnu/release/libfde_jni.so bin/x86_64-unknown-linux-gnu/ || true
+              - cp target/x86_64-unknown-linux-gnu/release/fde bin/x86_64-unknown-linux-gnu/ || true
+              - echo "✓ x86_64 Linux build complete"
+            artifacts:
+              - bin/x86_64-unknown-linux-gnu/**
+              - target/x86_64-unknown-linux-gnu/release/fde
+              - target/x86_64-unknown-linux-gnu/release/libfde_jni.*
+
+        - step:
+            name: Build Native (default target)
+            caches:
+              - cargo-registry
+              - cargo-git
+              - cargo-target
+            script:
+              # Install basic build tools
+              - apt-get update
+              - apt-get install -y gcc g++ libssl-dev pkg-config
+              - export CARGO_INCREMENTAL=1
+              - export CARGO_BUILD_JOBS=8
+              - cp .cargo/config-ci.toml .cargo/config.toml
+              - cargo build --release
+              - mkdir -p bin/native
+              - cp target/release/libfde_jni.so bin/native/ || true
+              - cp target/release/fde bin/native/ || true
+              - echo "✓ Native build complete"
+            artifacts:
+              - bin/native/**
+              - target/release/fde
+              - target/release/libfde_jni.*
+
+        - step:
+            name: Run Rust Tests
+            caches:
+              - cargo-registry
+              - cargo-git
+              - cargo-target
+            script:
+              # Install basic build tools
+              - apt-get update
+              - apt-get install -y gcc g++ libssl-dev pkg-config
+              - export CARGO_INCREMENTAL=1
+              - export CARGO_BUILD_JOBS=8
+              - cp .cargo/config-ci.toml .cargo/config.toml
+              - cargo test
+              - echo "✓ All Rust tests passed"
+
+    - step:
+        name: Cleanup Cache
+        caches:
+          - cargo-registry
+          - cargo-git
+          - cargo-target
+        script:
+          - |
+            echo "Cleaning up cache..."
+            find target -name "*.d" -delete 2>/dev/null || true
+            find target -name "*.rmeta" -delete 2>/dev/null || true
+            cargo cache --autoclean-expensive 2>/dev/null || echo "cargo-cache not available"
+
+            echo "Final cache sizes:"
+            du -sh ~/.cargo/registry ~/.cargo/git target 2>/dev/null || echo "Cache info unavailable"
+            echo "✓ Cache cleanup complete"
