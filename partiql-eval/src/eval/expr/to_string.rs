@@ -1,6 +1,6 @@
 use crate::eval::expr::{BindError, BindEvalExpr, EvalExpr};
 use crate::eval::EvalContext;
-use chrono::{Datelike, NaiveDate, NaiveDateTime, NaiveTime, Timelike};
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use partiql_value::{DateTime, Value};
 use std::borrow::Cow;
 
@@ -208,10 +208,8 @@ fn convert_partiql_pattern_to_chrono(pattern: &str) -> String {
             ("%-S".to_string(), 1) // Second without padding
         } else if remaining.starts_with('a') {
             ("%p".to_string(), 1) // AM/PM
-        } else if remaining.starts_with('X') {
-            ("%z".to_string(), 1) // Timezone offset with Z
-        } else if remaining.starts_with('x') {
-            ("%z".to_string(), 1) // Timezone offset without Z
+        } else if remaining.starts_with('X') || remaining.starts_with('x') {
+            ("%z".to_string(), 1) // Timezone offset (X allows Z, x doesn't)
         } else {
             // Literal character
             result.push(chars[i]);
@@ -224,123 +222,6 @@ fn convert_partiql_pattern_to_chrono(pattern: &str) -> String {
     }
 
     result
-}
-
-#[allow(clippy::too_many_arguments)]
-fn apply_format_pattern(
-    year: i32,
-    month: u8,
-    day: u8,
-    hour: Option<u8>,
-    minute: Option<u8>,
-    second: Option<u8>,
-    nanosecond: Option<u32>,
-    tz_offset_seconds: Option<i32>,
-    format: &str,
-) -> String {
-    let mut result = String::new();
-    let bytes = format.as_bytes();
-    let mut i = 0;
-
-    while i < bytes.len() {
-        let remaining = &format[i..];
-
-        // Check for format specifiers (longest patterns first)
-        let (replacement, skip) = if remaining.starts_with("yyyy") {
-            (format!("{:04}", year), 4)
-        } else if remaining.starts_with("MMMM") {
-            (get_month_name_full(month).to_string(), 4)
-        } else if remaining.starts_with("MMM") {
-            (get_month_name_abbr(month).to_string(), 3)
-        } else if remaining.starts_with("SSS") {
-            let millis = nanosecond.unwrap_or(0) / 1_000_000;
-            (format!("{:03}", millis), 3)
-        } else if remaining.starts_with("yy") {
-            (format!("{:02}", year % 100), 2)
-        } else if remaining.starts_with("MM") {
-            (format!("{:02}", month), 2)
-        } else if remaining.starts_with("dd") {
-            (format!("{:02}", day), 2)
-        } else if remaining.starts_with("HH") {
-            (format!("{:02}", hour.unwrap_or(0)), 2)
-        } else if remaining.starts_with("mm") {
-            (format!("{:02}", minute.unwrap_or(0)), 2)
-        } else if remaining.starts_with("ss") {
-            (format!("{:02}", second.unwrap_or(0)), 2)
-        } else if remaining.starts_with('M') {
-            (format!("{}", month), 1)
-        } else if remaining.starts_with('d') {
-            (format!("{}", day), 1)
-        } else if remaining.starts_with('H') {
-            (format!("{}", hour.unwrap_or(0)), 1)
-        } else if remaining.starts_with('m') {
-            (format!("{}", minute.unwrap_or(0)), 1)
-        } else if remaining.starts_with('s') {
-            (format!("{}", second.unwrap_or(0)), 1)
-        } else if remaining.starts_with('X') {
-            let tz_str = if let Some(offset) = tz_offset_seconds {
-                format_timezone_offset(offset)
-            } else {
-                "Z".to_string()
-            };
-            (tz_str, 1)
-        } else {
-            result.push(bytes[i] as char);
-            i += 1;
-            continue;
-        };
-
-        result.push_str(&replacement);
-        i += skip;
-    }
-
-    result
-}
-
-fn get_month_name_full(month: u8) -> &'static str {
-    match month {
-        1 => "January",
-        2 => "February",
-        3 => "March",
-        4 => "April",
-        5 => "May",
-        6 => "June",
-        7 => "July",
-        8 => "August",
-        9 => "September",
-        10 => "October",
-        11 => "November",
-        12 => "December",
-        _ => "",
-    }
-}
-
-fn get_month_name_abbr(month: u8) -> &'static str {
-    match month {
-        1 => "Jan",
-        2 => "Feb",
-        3 => "Mar",
-        4 => "Apr",
-        5 => "May",
-        6 => "Jun",
-        7 => "Jul",
-        8 => "Aug",
-        9 => "Sep",
-        10 => "Oct",
-        11 => "Nov",
-        12 => "Dec",
-        _ => "",
-    }
-}
-
-fn format_timezone_offset(offset_seconds: i32) -> String {
-    if offset_seconds == 0 {
-        return "Z".to_string();
-    }
-    let hours = offset_seconds / 3600;
-    let minutes = (offset_seconds.abs() % 3600) / 60;
-    let sign = if offset_seconds >= 0 { "+" } else { "-" };
-    format!("{}{:02}:{:02}", sign, hours.abs(), minutes)
 }
 
 #[cfg(test)]
