@@ -447,6 +447,7 @@ fn roundtrip() {
 }
 
 #[test]
+#[ignore = "requires ion-tests git submodule"]
 fn verify_ion_tests() {
     let mut result = String::new();
 
