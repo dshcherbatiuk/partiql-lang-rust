@@ -53,7 +53,6 @@ pipelines:
               - export AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar
               - export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
               - export PKG_CONFIG_ALLOW_CROSS=1
-              - cp .cargo/config-ci.toml .cargo/config.toml
               - cargo build --release --target aarch64-unknown-linux-gnu
               - mkdir -p bin/aarch64-unknown-linux-gnu
               - cp target/aarch64-unknown-linux-gnu/release/libfde_jni.so bin/aarch64-unknown-linux-gnu/ || true
@@ -81,7 +80,6 @@ pipelines:
               - export CXX_x86_64_unknown_linux_gnu=g++
               - export AR_x86_64_unknown_linux_gnu=ar
               - export PKG_CONFIG_ALLOW_CROSS=1
-              - cp .cargo/config-ci.toml .cargo/config.toml
               - cargo build --release --target x86_64-unknown-linux-gnu
               - mkdir -p bin/x86_64-unknown-linux-gnu
               - cp target/x86_64-unknown-linux-gnu/release/libfde_jni.so bin/x86_64-unknown-linux-gnu/ || true
@@ -104,7 +102,6 @@ pipelines:
               - apt-get install -y gcc g++ libssl-dev pkg-config
               - export CARGO_INCREMENTAL=1
               - export CARGO_BUILD_JOBS=8
-              - cp .cargo/config-ci.toml .cargo/config.toml
               - cargo build --release
               - mkdir -p bin/native
               - cp target/release/libfde_jni.so bin/native/ || true
@@ -127,7 +124,6 @@ pipelines:
               - apt-get install -y gcc g++ libssl-dev pkg-config
               - export CARGO_INCREMENTAL=1
               - export CARGO_BUILD_JOBS=8
-              - cp .cargo/config-ci.toml .cargo/config.toml
               - cargo test
               - echo "✓ All Rust tests passed"
 
