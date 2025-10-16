@@ -15,8 +15,9 @@ members = [
     "partiql-ast/partiql-ast-macros",
     "partiql-ast-passes",
     "partiql-catalog",
-    "partiql-conformance-tests",
-    "partiql-conformance-test-generator",
+    # Conformance tests excluded - requires partiql-tests-data submodule
+    # "partiql-conformance-tests",
+    # "partiql-conformance-test-generator",
     "partiql-common",
     "partiql-logical-planner",
     "partiql-logical",
