@@ -11,6 +11,7 @@ use partiql_parser::Parsed;
 use partiql_catalog::catalog::SharedCatalog;
 
 mod builtins;
+mod datetime_functions;
 mod functions;
 mod graph;
 mod lower;

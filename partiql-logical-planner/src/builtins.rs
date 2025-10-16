@@ -7,6 +7,10 @@ use rustc_hash::FxHashMap;
 use std::fmt::Debug;
 use unicase::UniCase;
 
+use crate::datetime_functions::{
+    function_call_def_current_time, function_call_def_current_timestamp,
+};
+
 fn function_call_def_char_len() -> CallDef {
     CallDef {
         names: vec!["char_length", "character_length"],
@@ -759,6 +763,8 @@ pub fn function_call_def() -> FnSymTab {
         function_call_def_mod(),
         function_call_def_cardinality(),
         function_call_def_extract(),
+        function_call_def_current_time(),
+        function_call_def_current_timestamp(),
         function_call_def_coll_avg(),
         function_call_def_coll_count(),
         function_call_def_coll_max(),

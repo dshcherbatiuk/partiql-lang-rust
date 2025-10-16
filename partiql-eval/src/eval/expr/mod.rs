@@ -8,6 +8,8 @@ mod data_types;
 pub(crate) use data_types::*;
 mod datetime;
 pub(crate) use datetime::*;
+mod datetime_functions;
+pub(crate) use datetime_functions::*;
 mod strings;
 pub(crate) use strings::*;
 mod path;

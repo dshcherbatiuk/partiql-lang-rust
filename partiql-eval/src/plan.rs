@@ -7,10 +7,11 @@ use crate::eval::evaluable::{
 };
 use crate::eval::expr::{
     BindError, BindEvalExpr, EvalBagExpr, EvalBetweenExpr, EvalCollFn, EvalDynamicLookup, EvalExpr,
-    EvalExtractFn, EvalFnAbs, EvalFnBaseTableExpr, EvalFnCardinality, EvalFnExists, EvalFnOverlay,
-    EvalFnPosition, EvalFnSubstring, EvalGraphMatch, EvalIsTypeExpr, EvalLikeMatch,
-    EvalLikeNonStringNonLiteralMatch, EvalListExpr, EvalLitExpr, EvalOpBinary, EvalOpUnary,
-    EvalPath, EvalSearchedCaseExpr, EvalStringFn, EvalTrimFn, EvalTupleExpr, EvalVarRef,
+    EvalExtractFn, EvalFnAbs, EvalFnBaseTableExpr, EvalFnCardinality, EvalFnCurrentTime,
+    EvalFnCurrentTimestamp, EvalFnExists, EvalFnOverlay, EvalFnPosition, EvalFnSubstring,
+    EvalGraphMatch, EvalIsTypeExpr, EvalLikeMatch, EvalLikeNonStringNonLiteralMatch, EvalListExpr,
+    EvalLitExpr, EvalOpBinary, EvalOpUnary, EvalPath, EvalSearchedCaseExpr, EvalStringFn,
+    EvalTrimFn, EvalTupleExpr, EvalVarRef,
 };
 use crate::eval::graph::plan::ValueFilter;
 use crate::eval::graph::string_graph::StringGraphTypes;
@@ -700,6 +701,14 @@ impl<'c> EvaluatorPlanner<'c> {
                     CallName::ExtractTimezoneMinute => (
                         "extract timezone_minute",
                         EvalExtractFn::TzMinute.bind::<{ STRICT }>(args),
+                    ),
+                    CallName::CurrentTime => (
+                        "current_time",
+                        EvalFnCurrentTime {}.bind::<{ STRICT }>(args),
+                    ),
+                    CallName::CurrentTimestamp => (
+                        "current_timestamp",
+                        EvalFnCurrentTimestamp {}.bind::<{ STRICT }>(args),
                     ),
 
                     CallName::CollAvg(setq) => (
