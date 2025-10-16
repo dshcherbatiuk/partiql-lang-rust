@@ -1,4 +1,4 @@
-use partiql_catalog::call_defs::{CallDef, CallSpec};
+use partiql_catalog::call_defs::{CallDef, CallSpec, CallSpecArg};
 use partiql_logical as logical;
 
 pub fn function_call_def_current_time() -> CallDef {
@@ -24,6 +24,21 @@ pub fn function_call_def_current_timestamp() -> CallDef {
             output: Box::new(|args| {
                 logical::ValueExpr::Call(logical::CallExpr {
                     name: logical::CallName::CurrentTimestamp,
+                    arguments: args,
+                })
+            }),
+        }],
+    }
+}
+
+pub(crate) fn function_call_def_to_string() -> CallDef {
+    CallDef {
+        names: vec!["to_string"],
+        overloads: vec![CallSpec {
+            input: vec![CallSpecArg::Positional, CallSpecArg::Positional],
+            output: Box::new(|args| {
+                logical::ValueExpr::Call(logical::CallExpr {
+                    name: logical::CallName::ToString,
                     arguments: args,
                 })
             }),

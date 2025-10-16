@@ -763,6 +763,7 @@ pub enum CallName {
     ExtractTimezoneMinute,
     CurrentTime,
     CurrentTimestamp,
+    ToString,
     CollAvg(SetQuantifier),
     CollCount(SetQuantifier),
     CollMax(SetQuantifier),
