@@ -31,6 +31,34 @@ pub fn function_call_def_current_timestamp() -> CallDef {
     }
 }
 
+pub fn function_call_def_unix_timestamp() -> CallDef {
+    CallDef {
+        names: vec!["unix_timestamp"],
+        overloads: vec![
+            // UNIX_TIMESTAMP() with no arguments
+            CallSpec {
+                input: vec![],
+                output: Box::new(|args| {
+                    logical::ValueExpr::Call(logical::CallExpr {
+                        name: logical::CallName::UnixTimestamp,
+                        arguments: args,
+                    })
+                }),
+            },
+            // UNIX_TIMESTAMP(timestamp) with one argument
+            CallSpec {
+                input: vec![CallSpecArg::Positional],
+                output: Box::new(|args| {
+                    logical::ValueExpr::Call(logical::CallExpr {
+                        name: logical::CallName::UnixTimestamp,
+                        arguments: args,
+                    })
+                }),
+            },
+        ],
+    }
+}
+
 pub(crate) fn function_call_def_to_string() -> CallDef {
     CallDef {
         names: vec!["to_string"],
@@ -64,5 +92,16 @@ mod tests {
         assert_eq!(def.names, vec!["current_timestamp"]);
         assert_eq!(def.overloads.len(), 1);
         assert_eq!(def.overloads[0].input.len(), 0);
+    }
+
+    #[test]
+    fn test_unix_timestamp_registration() {
+        let def = function_call_def_unix_timestamp();
+        assert_eq!(def.names, vec!["unix_timestamp"]);
+        assert_eq!(def.overloads.len(), 2);
+        // First overload: no arguments
+        assert_eq!(def.overloads[0].input.len(), 0);
+        // Second overload: one argument
+        assert_eq!(def.overloads[1].input.len(), 1);
     }
 }

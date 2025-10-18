@@ -9,7 +9,7 @@ use crate::eval::expr::{
     BindError, BindEvalExpr, EvalBagExpr, EvalBetweenExpr, EvalCollFn, EvalDynamicLookup, EvalExpr,
     EvalExtractFn, EvalFnAbs, EvalFnBaseTableExpr, EvalFnCardinality, EvalFnCurrentTime,
     EvalFnCurrentTimestamp, EvalFnExists, EvalFnOverlay, EvalFnPosition, EvalFnSubstring,
-    EvalFnToString, EvalGraphMatch, EvalIsTypeExpr, EvalLikeMatch,
+    EvalFnToString, EvalFnUnixTimestamp, EvalGraphMatch, EvalIsTypeExpr, EvalLikeMatch,
     EvalLikeNonStringNonLiteralMatch, EvalListExpr, EvalLitExpr, EvalOpBinary, EvalOpUnary,
     EvalPath, EvalSearchedCaseExpr, EvalStringFn, EvalTrimFn, EvalTupleExpr, EvalVarRef,
 };
@@ -709,6 +709,10 @@ impl<'c> EvaluatorPlanner<'c> {
                     CallName::CurrentTimestamp => (
                         "current_timestamp",
                         EvalFnCurrentTimestamp {}.bind::<{ STRICT }>(args),
+                    ),
+                    CallName::UnixTimestamp => (
+                        "unix_timestamp",
+                        EvalFnUnixTimestamp {}.bind::<{ STRICT }>(args),
                     ),
                     CallName::ToString => ("to_string", EvalFnToString.bind::<{ STRICT }>(args)),
 

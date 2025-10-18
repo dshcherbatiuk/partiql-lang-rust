@@ -9,7 +9,7 @@ use unicase::UniCase;
 
 use crate::datetime_functions::{
     function_call_def_current_time, function_call_def_current_timestamp,
-    function_call_def_to_string,
+    function_call_def_to_string, function_call_def_unix_timestamp,
 };
 
 fn function_call_def_char_len() -> CallDef {
@@ -766,6 +766,7 @@ pub fn function_call_def() -> FnSymTab {
         function_call_def_extract(),
         function_call_def_current_time(),
         function_call_def_current_timestamp(),
+        function_call_def_unix_timestamp(),
         function_call_def_to_string(),
         function_call_def_coll_avg(),
         function_call_def_coll_count(),
