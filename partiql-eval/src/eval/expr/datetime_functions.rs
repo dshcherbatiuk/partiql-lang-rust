@@ -169,6 +169,84 @@ impl EvalExpr for EvalExprUnixTimestampWithArgs {
     }
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub(crate) struct EvalFnFromUnixtime;
+
+impl BindEvalExpr for EvalFnFromUnixtime {
+    fn bind<const STRICT: bool>(
+        self,
+        args: Vec<Box<dyn EvalExpr>>,
+    ) -> Result<Box<dyn EvalExpr>, BindError> {
+        if args.len() != 1 {
+            return Err(BindError::ArgNumMismatch {
+                expected: vec![1],
+                found: args.len(),
+            });
+        }
+        Ok(Box::new(EvalExprFromUnixtime {
+            arg: args.into_iter().next().unwrap(),
+        }))
+    }
+}
+
+#[derive(Debug)]
+struct EvalExprFromUnixtime {
+    arg: Box<dyn EvalExpr>,
+}
+
+impl EvalExpr for EvalExprFromUnixtime {
+    fn evaluate<'a, 'c, 'o>(
+        &'a self,
+        bindings: &'a dyn partiql_value::datum::RefTupleView<'a, Value>,
+        ctx: &'c dyn EvalContext,
+    ) -> Cow<'o, Value>
+    where
+        'c: 'a,
+        'a: 'o,
+    {
+        // Evaluate the argument
+        let arg_value = self.arg.evaluate(bindings, ctx);
+
+        // Convert Unix timestamp (Integer or Decimal) to DateTime
+        match arg_value.as_ref() {
+            Value::Integer(seconds) => {
+                let dt = unix_timestamp_to_datetime(*seconds, 0);
+                Cow::Owned(Value::DateTime(Box::new(dt)))
+            }
+            Value::Decimal(dec) => {
+                // Convert decimal to total nanoseconds, then split into seconds and nanos
+                use rust_decimal::prelude::*;
+
+                // Convert to nanoseconds (may overflow for very large values)
+                let total_nanos = **dec * Decimal::from(1_000_000_000);
+                let total_nanos_i128 = total_nanos.to_i128().unwrap_or(0);
+
+                // Split into seconds and nanoseconds using Euclidean division
+                // This ensures nanos is always in [0, 1_000_000_000) range
+                let seconds = total_nanos_i128.div_euclid(1_000_000_000);
+                let nanos = total_nanos_i128.rem_euclid(1_000_000_000) as u32;
+
+                let dt = unix_timestamp_to_datetime(seconds as i64, nanos);
+                Cow::Owned(Value::DateTime(Box::new(dt)))
+            }
+            _ => Cow::Owned(Value::Missing),
+        }
+    }
+}
+
+/// Converts Unix timestamp (seconds since epoch) to DateTime
+/// Returns TimestampWithTz in UTC (offset 0)
+fn unix_timestamp_to_datetime(seconds: i64, nanos: u32) -> DateTime {
+    // Create OffsetDateTime from Unix timestamp
+    let offset_dt = time::OffsetDateTime::from_unix_timestamp_nanos(
+        (seconds as i128) * 1_000_000_000 + (nanos as i128),
+    )
+    .unwrap_or(time::OffsetDateTime::UNIX_EPOCH);
+
+    // Wrap in DateTime::TimestampWithTz
+    DateTime::TimestampWithTz(offset_dt)
+}
+
 /// Converts a DateTime to Unix timestamp (seconds since epoch)
 /// Returns Integer if no fractional seconds, Decimal otherwise
 fn datetime_to_unix_timestamp(dt: &DateTime) -> Value {
@@ -742,6 +820,188 @@ mod tests {
                 // This will show us what the correct value should be
             }
             other => panic!("Expected Integer, got {:?}", other),
+        }
+    }
+
+    // FROM_UNIXTIME tests
+    #[test]
+    fn test_from_unixtime_zero() {
+        let dt = unix_timestamp_to_datetime(0, 0);
+        // Should be 1970-01-01T00:00:00Z
+        match dt {
+            DateTime::TimestampWithTz(ts) => {
+                assert_eq!(ts.unix_timestamp(), 0);
+                assert_eq!(ts.nanosecond(), 0);
+            }
+            other => panic!("Expected TimestampWithTz, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_from_unixtime_positive() {
+        // FROM_UNIXTIME(1577836800) -> 2020-01-01T00:00:00Z
+        let dt = unix_timestamp_to_datetime(1577836800, 0);
+        match dt {
+            DateTime::TimestampWithTz(ts) => {
+                assert_eq!(ts.unix_timestamp(), 1577836800);
+                assert_eq!(ts.nanosecond(), 0);
+            }
+            other => panic!("Expected TimestampWithTz, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_from_unixtime_negative() {
+        // FROM_UNIXTIME(-1) -> 1969-12-31T23:59:59Z
+        let dt = unix_timestamp_to_datetime(-1, 0);
+        match dt {
+            DateTime::TimestampWithTz(ts) => {
+                assert_eq!(ts.unix_timestamp(), -1);
+                assert_eq!(ts.nanosecond(), 0);
+            }
+            other => panic!("Expected TimestampWithTz, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_from_unixtime_with_fractional_seconds() {
+        // FROM_UNIXTIME(0.1) -> 1970-01-01T00:00:00.1Z
+        let dt = unix_timestamp_to_datetime(0, 100_000_000); // 0.1 seconds in nanoseconds
+        match dt {
+            DateTime::TimestampWithTz(ts) => {
+                assert_eq!(ts.unix_timestamp(), 0);
+                assert_eq!(ts.nanosecond(), 100_000_000);
+            }
+            other => panic!("Expected TimestampWithTz, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_from_unixtime_with_milliseconds() {
+        // FROM_UNIXTIME(0.001) -> 1970-01-01T00:00:00.001Z
+        let dt = unix_timestamp_to_datetime(0, 1_000_000); // 0.001 seconds in nanoseconds
+        match dt {
+            DateTime::TimestampWithTz(ts) => {
+                assert_eq!(ts.unix_timestamp(), 0);
+                assert_eq!(ts.nanosecond(), 1_000_000);
+            }
+            other => panic!("Expected TimestampWithTz, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_from_unixtime_negative_with_fractional() {
+        // FROM_UNIXTIME(-0.1) -> 1969-12-31T23:59:59.9Z
+        // -0.1 seconds = -1 second + 900,000,000 nanoseconds
+        let dt = unix_timestamp_to_datetime(-1, 900_000_000);
+        match dt {
+            DateTime::TimestampWithTz(ts) => {
+                // The timestamp should be -1 second with 900ms nanoseconds
+                assert_eq!(ts.unix_timestamp(), -1);
+                assert_eq!(ts.nanosecond(), 900_000_000);
+            }
+            other => panic!("Expected TimestampWithTz, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_from_unixtime_function_binding() {
+        let result = EvalFnFromUnixtime.bind::<true>(vec![]);
+        assert!(matches!(result, Err(BindError::ArgNumMismatch { .. })));
+
+        use crate::eval::expr::EvalLitExpr;
+        let arg = EvalLitExpr::new(Value::Integer(0))
+            .bind::<true>(vec![])
+            .unwrap();
+        let result = EvalFnFromUnixtime.bind::<true>(vec![arg]);
+        assert!(result.is_ok());
+
+        let arg1 = EvalLitExpr::new(Value::Integer(0))
+            .bind::<true>(vec![])
+            .unwrap();
+        let arg2 = EvalLitExpr::new(Value::Integer(1))
+            .bind::<true>(vec![])
+            .unwrap();
+        let result = EvalFnFromUnixtime.bind::<true>(vec![arg1, arg2]);
+        assert!(matches!(result, Err(BindError::ArgNumMismatch { .. })));
+    }
+
+    #[test]
+    fn test_from_unixtime_evaluation_integer() {
+        use crate::env::basic::MapBindings;
+        use crate::eval::expr::EvalLitExpr;
+        use partiql_catalog::context::SystemContext;
+        use partiql_value::datum::DatumTupleRef;
+        use partiql_value::Tuple;
+
+        // Create the evaluation context
+        let sys_ctx = SystemContext {
+            now: DateTime::from_system_now_utc(),
+        };
+        let ctx = BasicContext::new(MapBindings::default(), sys_ctx);
+        let bindings = Tuple::new();
+        let binding = DatumTupleRef::Tuple(&bindings);
+
+        // Create the expression with Integer argument (1577836800 = 2020-01-01T00:00:00Z)
+        let arg_expr = EvalLitExpr::new(Value::Integer(1577836800));
+        let expr = EvalExprFromUnixtime {
+            arg: Box::new(arg_expr),
+        };
+
+        // Evaluate
+        let result = expr.evaluate(&binding, &ctx);
+
+        // Should return DateTime
+        match result.as_ref() {
+            Value::DateTime(dt) => match dt.as_ref() {
+                DateTime::TimestampWithTz(ts) => {
+                    assert_eq!(ts.unix_timestamp(), 1577836800);
+                    assert_eq!(ts.nanosecond(), 0);
+                }
+                other => panic!("Expected TimestampWithTz, got {:?}", other),
+            },
+            other => panic!("Expected DateTime, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_from_unixtime_round_trip() {
+        use std::num::NonZeroU8;
+
+        // Test round-trip: DateTime -> Unix timestamp -> DateTime
+        let original_dt = DateTime::from_ymdhms_nano_offset_minutes(
+            2020,
+            NonZeroU8::new(1).unwrap(),
+            1,
+            0,
+            0,
+            0,
+            0,
+            Some(0), // UTC
+        );
+
+        // Convert to Unix timestamp
+        let unix_ts = datetime_to_unix_timestamp(&original_dt);
+
+        // Convert back to DateTime
+        let seconds = match unix_ts {
+            Value::Integer(s) => s,
+            _ => panic!("Expected Integer"),
+        };
+        let recovered_dt = unix_timestamp_to_datetime(seconds, 0);
+
+        // Verify round-trip
+        match (&original_dt, &recovered_dt) {
+            (DateTime::TimestampWithTz(ts1), DateTime::TimestampWithTz(ts2)) => {
+                assert_eq!(ts1.unix_timestamp(), ts2.unix_timestamp());
+                assert_eq!(ts1.nanosecond(), ts2.nanosecond());
+            }
+            (DateTime::Timestamp(ts1), DateTime::TimestampWithTz(ts2)) => {
+                let ts1_utc = ts1.assume_utc();
+                assert_eq!(ts1_utc.unix_timestamp(), ts2.unix_timestamp());
+                assert_eq!(ts1_utc.nanosecond(), ts2.nanosecond());
+            }
+            _ => panic!("Unexpected DateTime types"),
         }
     }
 }

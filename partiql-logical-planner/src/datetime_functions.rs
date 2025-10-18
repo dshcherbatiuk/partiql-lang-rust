@@ -59,6 +59,21 @@ pub fn function_call_def_unix_timestamp() -> CallDef {
     }
 }
 
+pub fn function_call_def_from_unixtime() -> CallDef {
+    CallDef {
+        names: vec!["from_unixtime"],
+        overloads: vec![CallSpec {
+            input: vec![CallSpecArg::Positional],
+            output: Box::new(|args| {
+                logical::ValueExpr::Call(logical::CallExpr {
+                    name: logical::CallName::FromUnixtime,
+                    arguments: args,
+                })
+            }),
+        }],
+    }
+}
+
 pub(crate) fn function_call_def_to_string() -> CallDef {
     CallDef {
         names: vec!["to_string"],
@@ -103,5 +118,14 @@ mod tests {
         assert_eq!(def.overloads[0].input.len(), 0);
         // Second overload: one argument
         assert_eq!(def.overloads[1].input.len(), 1);
+    }
+
+    #[test]
+    fn test_from_unixtime_registration() {
+        let def = function_call_def_from_unixtime();
+        assert_eq!(def.names, vec!["from_unixtime"]);
+        assert_eq!(def.overloads.len(), 1);
+        // One argument: unix timestamp
+        assert_eq!(def.overloads[0].input.len(), 1);
     }
 }

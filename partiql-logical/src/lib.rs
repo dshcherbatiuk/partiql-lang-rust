@@ -764,6 +764,7 @@ pub enum CallName {
     CurrentTime,
     CurrentTimestamp,
     UnixTimestamp,
+    FromUnixtime,
     ToString,
     CollAvg(SetQuantifier),
     CollCount(SetQuantifier),
