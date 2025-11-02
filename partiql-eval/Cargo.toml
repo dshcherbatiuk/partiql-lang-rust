@@ -29,27 +29,27 @@ partiql-types = { path = "../partiql-types", version = "0.14.0-nxp" }
 partiql-extension-ion = { path = "../extension/partiql-extension-ion", version = "0.14.0-nxp" }
 ion-rs_old = { version = "0.18.1", package = "ion-rs" }
 lasso = "0.7.3"
-petgraph = "0.7.1"
-indexmap = "2.0.2"
-ordered-float = "5"
+petgraph = "0.8.3"
+indexmap = "2.12.0"
+ordered-float = "5.1.0"
 itertools = "0.14"
-unicase = "2"
-rust_decimal = { version = "1.0.3", default-features = false, features = ["std"] }
-rust_decimal_macros = "1.0.3"
+unicase = "2.8.1"
+rust_decimal = { version = "1.39.0", default-features = false, features = ["std"] }
+rust_decimal_macros = "1.39.0"
 thiserror = "1.0.69"
-assert_matches = "1.0.1"
-regex = "1.0.6"
+assert_matches = "1.5.0"
+regex = "1.12.2"
 regex-syntax = "0.8.8"
-rustc-hash = "2"
+rustc-hash = "2.1.1"
 delegate = "0.13.4"
 chrono = { version = "0.4.42", default-features = false, features = ["alloc"] }
 time = { version = "0.3.44", features = ["macros"] }
 
 serde = { version = "1.0.228", features = ["derive"], optional = true }
-once_cell = "1.0.2"
+once_cell = "1.21.3"
 
 [dev-dependencies]
-criterion = "0.5.1"
+criterion = "0.7.0"
 partiql-parser = { path = "../partiql-parser", version = "0.14.0-nxp" }
 partiql-logical-planner = { path = "../partiql-logical-planner", version = "0.14.0-nxp" }
 

@@ -25,11 +25,11 @@ partiql-common = { path = "../partiql-common", version = "0.14.0-nxp" }
 partiql-types = { path = "../partiql-types", version = "0.14.0-nxp" }
 lasso = "0.7.3"
 delegate = "0.13.4"
-ordered-float = "5"
+ordered-float = "5.1.0"
 itertools = "0.14"
-unicase = "2.7"
-rust_decimal = { version = "1.36.0", default-features = false, features = ["std"] }
-rust_decimal_macros = "1.36"
+unicase = "2.8.1"
+rust_decimal = { version = "1.39.0", default-features = false, features = ["std"] }
+rust_decimal_macros = "1.39.0"
 thiserror = "1.0.69"
 
 time = { version = "0.3.44", features = ["macros"] }

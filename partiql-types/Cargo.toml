@@ -24,10 +24,10 @@ bench = false
 partiql-common = { path = "../partiql-common", version = "0.14.0-nxp" }
 itertools = "0.14"
 
-miette = { version = "7", features = ["fancy"] }
+miette = { version = "7.6.0", features = ["fancy"] }
 thiserror = "1.0.69"
 
-indexmap = "2.0.2"
+indexmap = "2.12.0"
 
 educe = "0.6"
 
