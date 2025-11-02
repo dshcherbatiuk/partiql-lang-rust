@@ -33,7 +33,7 @@ unicase = "2.7"
 thiserror = "1.0.69"
 rustc-hash = "2"
 
-serde = { version = "1", features = ["derive"], optional = true }
+serde = { version = "1.0.228", features = ["derive"], optional = true }
 
 [features]
 default = []

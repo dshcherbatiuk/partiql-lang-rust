@@ -35,7 +35,7 @@ thiserror = "1.0.69"
 time = { version = "0.3.44", features = ["macros"] }
 pretty = "0.12.5"
 
-serde = { version = "1", features = ["derive"], optional = true }
+serde = { version = "1.0.228", features = ["derive"], optional = true }
 typetag = { version = "0.2.21", optional = true }
 
 
