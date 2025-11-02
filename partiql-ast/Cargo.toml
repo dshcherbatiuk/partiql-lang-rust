@@ -21,11 +21,11 @@ bench = false
 
 [dependencies]
 partiql-common = { path = "../partiql-common", version = "0.14.0-nxp" }
-indexmap = "2"
+indexmap = "2.0.2"
 rust_decimal = { version = "1.36.0", default-features = false, features = ["std"] }
 serde = { version = "1", features = ["derive"], optional = true }
-pretty = "0.12"
-thiserror = "1.0"
+pretty = "0.12.5"
+thiserror = "1.0.69"
 
 [features]
 default = []

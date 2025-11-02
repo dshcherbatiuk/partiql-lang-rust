@@ -12,7 +12,7 @@ edition.workspace = true
 cargo-fuzz = true
 
 [dependencies]
-libfuzzer-sys = "0.4"
+libfuzzer-sys = "0.4.10"
 
 [dependencies.partiql-parser]
 path = ".."

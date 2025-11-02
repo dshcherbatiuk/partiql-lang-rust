@@ -24,13 +24,13 @@ bench = false
 partiql-value = { path = "../partiql-value", version = "0.14.0-nxp" }
 partiql-common = { path = "../partiql-common", version = "0.14.0-nxp" }
 
-ion-rs_old = { version = "0.18", package = "ion-rs" }
+ion-rs_old = { version = "0.18.1", package = "ion-rs" }
 ordered-float = "5"
 itertools = "0.14"
 rust_decimal = { version = "1.36.0", default-features = false, features = ["std"] }
 rust_decimal_macros = "1.36"
 unicase = "2.7"
-thiserror = "1"
+thiserror = "1.0.69"
 rustc-hash = "2"
 
 serde = { version = "1", features = ["derive"], optional = true }

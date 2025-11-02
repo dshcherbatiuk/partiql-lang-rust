@@ -26,10 +26,10 @@ partiql-value = { path = "../partiql-value", version = "0.14.0-nxp" }
 partiql-logical = { path = "../partiql-logical", version = "0.14.0-nxp" }
 partiql-types = { path = "../partiql-types", version = "0.14.0-nxp" }
 
-thiserror = "1.0"
+thiserror = "1.0.69"
 ordered-float = "5"
 itertools = "0.14"
 unicase = "2.7"
 rustc-hash = "2"
-delegate = "0.13"
-dyn-clone = "1"
+delegate = "0.13.4"
+dyn-clone = "1.0.20"
