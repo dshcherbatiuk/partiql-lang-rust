@@ -28,7 +28,7 @@ lalrpop = "0.22.2"
 partiql-ast = { path = "../partiql-ast", version = "0.14.0-nxp" }
 partiql-common = { path = "../partiql-common", version = "0.14.0-nxp" }
 
-thiserror = "1.0.69"
+thiserror = "2.0.17"
 
 num-traits = "0.2.19"
 rust_decimal = { version = "1.39.0", default-features = false, features = ["std"] }

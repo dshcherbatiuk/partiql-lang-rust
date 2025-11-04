@@ -25,7 +25,7 @@ pretty = "0.12.5"
 serde = { version = "1.0.228", features = ["derive"], optional = true }
 rust_decimal = { version = "1.39.0", default-features = false, features = ["std"] }
 smallvec = { version = "1.15.1" }
-thiserror = "1.0.69"
+thiserror = "2.0.17"
 
 [features]
 default = []
