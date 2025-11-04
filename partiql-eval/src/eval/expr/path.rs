@@ -25,6 +25,7 @@ pub(crate) enum EvalPathComponent {
     KeyExpr(Box<dyn EvalExpr>),
     Index(i64),
     IndexExpr(Box<dyn EvalExpr>),
+    Unpivot,
 }
 
 impl Debug for EvalPathComponent {
@@ -45,6 +46,7 @@ impl Debug for EvalPathComponent {
                 ie.fmt(f)?;
                 write!(f, "]")
             }
+            EvalPathComponent::Unpivot => write!(f, ".*"),
         }
     }
 }
@@ -102,6 +104,10 @@ impl EvalPathComponent {
             (EvalPathComponent::IndexExpr(ie), DatumCategoryRef::Sequence(seq)) => {
                 as_int(ie.evaluate(bindings, ctx).borrow()).and_then(|i| seq.get_val(i))
             }
+            (EvalPathComponent::Unpivot, _) => {
+                // Unpivot (.* syntax) returns the value as-is
+                Some(Cow::Borrowed(value))
+            }
             _ => None,
         }
     }
@@ -116,6 +122,11 @@ impl EvalPathComponent {
     where
         'c: 'a,
     {
+        if let EvalPathComponent::Unpivot = self {
+            // Unpivot (.* syntax) returns the value as-is
+            return Some(Cow::Owned(value));
+        }
+
         let category = value.into_category();
         match (self, category) {
             (EvalPathComponent::Key(k), DatumCategoryOwned::Tuple(tuple)) => tuple.take_val(k),

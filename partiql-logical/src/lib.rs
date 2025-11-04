@@ -540,6 +540,8 @@ pub enum PathComponent {
     Index(i64),
     KeyExpr(Box<ValueExpr>),
     IndexExpr(Box<ValueExpr>),
+    /// E.g. `.*` in `u.*` - unpivot/expand all fields from the path
+    Unpivot,
 }
 
 /// Represents a `PartiQL` tuple expression, e.g: `{ a.b: a.c * 2, 'count': a.c + 10}`.

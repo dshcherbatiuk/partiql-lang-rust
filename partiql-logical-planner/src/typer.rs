@@ -333,6 +333,10 @@ impl<'c> PlanTyper<'c> {
                                 "Typing [IndexExpr] [PathComponent]s".to_string(),
                             ));
                         }
+                        PathComponent::Unpivot => {
+                            // Unpivot (.* syntax) doesn't change the type environment
+                            // It returns the entire value, so no new bindings are introduced
+                        }
                     }
                 }
             }

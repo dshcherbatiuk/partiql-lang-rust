@@ -1467,7 +1467,8 @@ impl<'ast> Visitor<'ast> for AstToLogical<'_> {
                 not_yet_implemented_fault!(self, "PathStep::PathForEach".to_string());
             }
             PathStep::PathUnpivot => {
-                not_yet_implemented_fault!(self, "PathStep::PathUnpivot".to_string());
+                // PathUnpivot represents .* syntax (e.g., u.* to expand all fields)
+                logical::PathComponent::Unpivot
             }
         };
 

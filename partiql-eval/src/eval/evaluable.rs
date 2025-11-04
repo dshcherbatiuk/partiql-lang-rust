@@ -1123,14 +1123,35 @@ impl Evaluable for EvalSelect {
         let values = input_value.into_iter().map(|v| {
             let v_as_tuple = v.as_datum_tuple_ref();
 
-            let tuple_pairs = self.exprs.iter().filter_map(|(alias, expr)| {
+            let tuple_pairs = self.exprs.iter().flat_map(|(alias, expr)| {
                 let evaluated_val = expr.evaluate(&v_as_tuple, ctx);
-                match evaluated_val.as_ref() {
-                    Missing => None,
-                    _ => Some((alias.as_str(), evaluated_val.into_owned())),
+                let owned_val = evaluated_val.into_owned();
+
+                // Use SmallVec to avoid heap allocation for typical tuple sizes (< 16 fields)
+                type PairVec = smallvec::SmallVec<[(String, Value); 16]>;
+
+                // If MISSING, skip this projection
+                if matches!(owned_val, Missing) {
+                    return PairVec::new();
                 }
+
+                // If alias starts with '_' (auto-generated) and value is a tuple,
+                // spread the tuple's fields instead of wrapping them
+                if alias.starts_with('_') {
+                    if let Value::Tuple(tuple) = owned_val {
+                        // Spread tuple fields (SELECT u.* behavior)
+                        return tuple
+                            .pairs()
+                            .map(|(k, v)| (k.to_string(), v.clone()))
+                            .collect();
+                    }
+                }
+
+                // Normal projection: wrap with alias
+                smallvec::smallvec![(alias.to_string(), owned_val)]
             });
 
+            // FromIterator for Tuple accepts (S: Into<String>, T: Into<Value>)
             tuple_pairs.collect::<Tuple>()
         });
 

@@ -33,6 +33,7 @@ petgraph = "0.7"
 indexmap = "2"
 ordered-float = "5"
 itertools = "0.14"
+smallvec = "1"
 unicase = "2"
 rust_decimal = { version = "1", default-features = false, features = ["std"] }
 rust_decimal_macros = "1"

@@ -427,6 +427,7 @@ impl<'c> EvaluatorPlanner<'c> {
                                     self.plan_value::<{ STRICT }>(i),
                                 )
                             }
+                            PathComponent::Unpivot => eval::expr::EvalPathComponent::Unpivot,
                         })
                         .collect(),
                 }) as Box<dyn EvalExpr>),
