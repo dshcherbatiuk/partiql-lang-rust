@@ -24,9 +24,9 @@ bench = false
 partiql-value = { path = "../../partiql-value", version = "0.14.0-nxp" }
 partiql-catalog = { path = "../../partiql-catalog", version = "0.14.0-nxp" }
 
-ordered-float = "5"
-unicase = "2.6"
-time = { version = "0.3", features = ["macros"] }
+ordered-float = "5.1.0"
+unicase = "2.8.1"
+time = { version = "0.3.44", features = ["macros"] }
 
 [features]
 default = []
