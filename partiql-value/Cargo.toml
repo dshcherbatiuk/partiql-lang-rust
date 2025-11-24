@@ -24,7 +24,7 @@ bench = false
 partiql-common = { path = "../partiql-common", version = "0.14.0-nxp" }
 partiql-types = { path = "../partiql-types", version = "0.14.0-nxp" }
 lasso = "0.7.3"
-delegate = "0.13.4"
+delegate = "0.13.5"
 ordered-float = "5.1.0"
 itertools = "0.14"
 unicase = "2.8.1"

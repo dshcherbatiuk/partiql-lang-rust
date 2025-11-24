@@ -27,7 +27,7 @@ thiserror = "2.0.17"
 miette = { version = "7.6.0", features = ["fancy"] }
 time = { version = "0.3.44", features = ["formatting", "parsing", "serde"] }
 
-indexmap = "2.12.0"
+indexmap = "2.12.1"
 
 [dev-dependencies]
 

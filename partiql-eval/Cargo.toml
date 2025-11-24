@@ -30,7 +30,7 @@ partiql-extension-ion = { path = "../extension/partiql-extension-ion", version =
 ion-rs_old = { version = "0.18.1", package = "ion-rs" }
 lasso = "0.7.3"
 petgraph = "0.8.3"
-indexmap = "2.12.0"
+indexmap = "2.12.1"
 ordered-float = "5.1.0"
 itertools = "0.14"
 smallvec = "1.15.1"
@@ -42,7 +42,7 @@ assert_matches = "1.5.0"
 regex = "1.12.2"
 regex-syntax = "0.8.8"
 rustc-hash = "2.1.1"
-delegate = "0.13.4"
+delegate = "0.13.5"
 chrono = { version = "0.4.42", default-features = false, features = ["alloc"] }
 time = { version = "0.3.44", features = ["macros"] }
 
