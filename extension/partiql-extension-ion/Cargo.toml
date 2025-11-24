@@ -44,7 +44,7 @@ delegate = "0.13.5"
 peekmore = "1.3"
 
 [dev-dependencies]
-insta = "1.43.2"
+insta = "1.44.1"
 walkdir = "2.5"
 
 [features]
