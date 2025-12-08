@@ -25,5 +25,5 @@ bench = false
 quote = "1.0.42"
 syn = { version = "2.0.111", default-features = true, features = ["full"] }
 proc-macro2 = "1.0.103"
-darling = "0.21.3"
+darling = "0.23.0"
 Inflector = "0.11.4"
