@@ -25,6 +25,6 @@ ion-rs_old = { version = "0.18.1", package = "ion-rs" }
 codegen = "0.2"
 Inflector = "0.11.4"
 miette = { version = "7.6.0", features = ["fancy"] }
-thiserror = "2.0.17"
-quote = "1.0.43"
+thiserror = "2.0.18"
+quote = "1.0.44"
 itertools = "0.14"

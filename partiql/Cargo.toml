@@ -43,11 +43,11 @@ ion-rs_old = { version = "0.18.1", package = "ion-rs" }
 insta = "1.44.3"
 
 
-thiserror = "2.0.17"
+thiserror = "2.0.18"
 
 itertools = "0.14"
 rust_decimal = { version = "1.39.0", default-features = false, features = ["std"] }
-time = { version = "0.3.45", features = ["macros"] }
+time = { version = "0.3.46", features = ["macros"] }
 
 criterion = "0.8.1"
 rand = "0.9.2"
