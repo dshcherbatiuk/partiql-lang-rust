@@ -25,7 +25,7 @@ partiql-types = { path = "../../partiql-types", version = "0.14.0-nxp" }
 
 thiserror = "2.0.18"
 miette = { version = "7.6.0", features = ["fancy"] }
-time = { version = "0.3.45", features = ["formatting", "parsing", "serde"] }
+time = { version = "0.3.46", features = ["formatting", "parsing", "serde"] }
 
 indexmap = "2.12.1"
 
