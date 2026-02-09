@@ -45,7 +45,7 @@ partiql-extension-ion = { path = "../extension/partiql-extension-ion", version =
 
 ion-rs_old = { version = "0.18.1", package = "ion-rs" }
 
-regex = "1.12.2"
+regex = "1.12.3"
 once_cell = "1.21.3"
 
 rust_decimal = "1.39.0"
