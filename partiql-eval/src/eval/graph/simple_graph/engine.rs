@@ -17,19 +17,19 @@ use partiql_value::{GEdgeId, GLabelId, GNodeId, SimpleGraph, Value};
 use rustc_hash::FxBuildHasher;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::rc::Rc;
 
 /// [`GraphEngine`] for [`SimpleGraph`]
 #[derive(Debug, Clone)]
 pub struct SimpleGraphEngine {
     /// The graph.
-    pub graph: Arc<SimpleGraph>,
+    pub graph: Rc<SimpleGraph>,
     /// A string interner for turning string labels into interned labels.
     pub binder: RefCell<Rodeo>,
 }
 
 impl SimpleGraphEngine {
-    pub fn new(g: Arc<SimpleGraph>) -> Self {
+    pub fn new(g: Rc<SimpleGraph>) -> Self {
         Self {
             graph: g,
             binder: Rodeo::default().into(),
