@@ -6,11 +6,11 @@ use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[derive(Clone, Debug)]
 pub enum Graph {
-    Simple(Rc<SimpleGraph>),
+    Simple(Arc<SimpleGraph>),
 }
 
 #[cfg(feature = "serde")]

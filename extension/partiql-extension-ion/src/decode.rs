@@ -13,7 +13,7 @@ use crate::common::{
     TIME_PARTS_TZ_HOUR, TIME_PARTS_TZ_MINUTE,
 };
 use std::num::NonZeroU8;
-use std::rc::Rc;
+use std::sync::Arc;
 use std::str::FromStr;
 use thiserror::Error;
 use time::Duration;
@@ -582,7 +582,7 @@ impl PartiqlEncodedIonValueDecoder {
                 _ => Err(err()),
             })
             .collect::<Result<Vec<EdgeSpec>, _>>()?;
-        Ok(Value::Graph(Box::new(Graph::Simple(Rc::new(
+        Ok(Value::Graph(Box::new(Graph::Simple(Arc::new(
             SimpleGraph::from_spec(nodes, (ids, labels, edge_specs, payloads)),
         )))))
     }
