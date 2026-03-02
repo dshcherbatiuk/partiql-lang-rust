@@ -40,10 +40,10 @@ rust_decimal_macros = "1.39.0"
 thiserror = "2.0.18"
 assert_matches = "1.5.0"
 regex = "1.12.3"
-regex-syntax = "0.8.9"
+regex-syntax = "0.8.10"
 rustc-hash = "2.1.1"
 delegate = "0.13.5"
-chrono = { version = "0.4.43", default-features = false, features = ["alloc"] }
+chrono = { version = "0.4.44", default-features = false, features = ["alloc"] }
 time = { version = "0.3.47", features = ["macros"] }
 
 serde = { version = "1.0.228", features = ["derive"], optional = true }
