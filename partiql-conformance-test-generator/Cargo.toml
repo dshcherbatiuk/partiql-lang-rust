@@ -26,5 +26,5 @@ codegen = "0.2"
 Inflector = "0.11.4"
 miette = { version = "7.6.0", features = ["fancy"] }
 thiserror = "2.0.18"
-quote = "1.0.44"
+quote = "1.0.45"
 itertools = "0.14"
