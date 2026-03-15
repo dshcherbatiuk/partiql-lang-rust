@@ -5,23 +5,55 @@ use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
+use std::sync::Arc;
 
 use std::{slice, vec};
 
 use crate::sort::NullSortedValue;
 use crate::{EqualityValue, List, NullableEq, Value};
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 
-#[derive(Default, Eq, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Eq)]
 /// Represents a `PartiQL` BAG value, e.g.: <<1, 'two', 4>>
-pub struct Bag(Vec<Value>);
+///
+/// Internally backed by `Arc<Vec<Value>>` so that cloning a Bag is O(1)
+/// (atomic refcount increment) instead of deep-cloning all elements.
+/// Mutation via `push`/`reserve`/`extend` uses `Arc::make_mut` which
+/// only copies when the refcount > 1 (copy-on-write semantics).
+pub struct Bag(Arc<Vec<Value>>);
+
+impl Default for Bag {
+    #[inline]
+    fn default() -> Self {
+        Bag(Arc::new(Vec::new()))
+    }
+}
+
+impl Clone for Bag {
+    /// O(1) clone via atomic refcount increment.
+    #[inline]
+    fn clone(&self) -> Self {
+        Bag(Arc::clone(&self.0))
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for Bag {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.0.as_ref().serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Bag {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Vec::<Value>::deserialize(deserializer).map(|v| Bag(Arc::new(v)))
+    }
+}
 
 impl Bag {
     #[inline]
     pub fn push(&mut self, value: Value) {
-        self.0.push(value);
+        Arc::make_mut(&mut self.0).push(value);
     }
 
     #[inline]
@@ -44,13 +76,13 @@ impl Bag {
 
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
-        self.0.reserve(additional);
+        Arc::make_mut(&mut self.0).reserve(additional);
     }
 
     #[inline]
     #[must_use]
     pub fn to_vec(self) -> Vec<Value> {
-        self.0
+        Arc::try_unwrap(self.0).unwrap_or_else(|arc| (*arc).clone())
     }
 }
 
@@ -67,21 +99,21 @@ impl Extend<Value> for Bag {
 impl From<Vec<Value>> for Bag {
     #[inline]
     fn from(values: Vec<Value>) -> Self {
-        Bag(values)
+        Bag(Arc::new(values))
     }
 }
 
 impl From<HashSet<Value>> for Bag {
     #[inline]
     fn from(values: HashSet<Value>) -> Self {
-        Bag(values.into_iter().collect())
+        Bag(Arc::new(values.into_iter().collect()))
     }
 }
 
 impl From<List> for Bag {
     #[inline]
     fn from(list: List) -> Self {
-        Bag(list.to_vec())
+        Bag(Arc::new(list.to_vec()))
     }
 }
 
@@ -141,7 +173,8 @@ impl IntoIterator for Bag {
     type IntoIter = BagIntoIterator;
 
     fn into_iter(self) -> BagIntoIterator {
-        BagIntoIterator(self.0.into_iter())
+        let vec = Arc::try_unwrap(self.0).unwrap_or_else(|arc| (*arc).clone());
+        BagIntoIterator(vec.into_iter())
     }
 }
 
@@ -223,19 +256,19 @@ impl<const NULLS_FIRST: bool> Ord for NullSortedValue<'_, NULLS_FIRST, Bag> {
     fn cmp(&self, other: &Self) -> Ordering {
         let wrap = NullSortedValue::<{ NULLS_FIRST }, List>;
 
-        let mut l = self.0.clone();
-        l.0.sort();
-        let mut r = other.0.clone();
-        r.0.sort();
+        let mut l: Vec<Value> = self.0 .0.as_ref().clone();
+        l.sort();
+        let mut r: Vec<Value> = other.0 .0.as_ref().clone();
+        r.sort();
         wrap(&List::from(l)).cmp(&wrap(&List::from(r)))
     }
 }
 
 impl Ord for Bag {
     fn cmp(&self, other: &Self) -> Ordering {
-        let mut l = self.0.clone();
+        let mut l: Vec<Value> = self.0.as_ref().clone();
         l.sort();
-        let mut r = other.0.clone();
+        let mut r: Vec<Value> = other.0.as_ref().clone();
         r.sort();
         List::from(l).cmp(&List::from(r))
     }
