@@ -1,11 +1,11 @@
 use itertools::Itertools;
+use smallvec::SmallVec;
 
 use std::cmp::Ordering;
 
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
 use std::iter::{zip, Zip};
-use std::vec;
 
 use crate::sort::NullSortedValue;
 use crate::{BindingsName, EqualityValue, NullableEq, Value};
@@ -15,16 +15,16 @@ use serde::{Deserialize, Serialize};
 #[derive(Default, Eq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Tuple {
-    attrs: Vec<String>,
-    vals: Vec<Value>,
+    attrs: SmallVec<[String; 8]>,
+    vals: SmallVec<[Value; 8]>,
 }
 
 impl Tuple {
     #[must_use]
     pub fn new() -> Self {
         Tuple {
-            attrs: vec![],
-            vals: vec![],
+            attrs: SmallVec::new(),
+            vals: SmallVec::new(),
         }
     }
 
@@ -133,7 +133,7 @@ impl<'a> Iterator for PairsIter<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct PairsIntoIter(Zip<std::vec::IntoIter<String>, std::vec::IntoIter<Value>>);
+pub struct PairsIntoIter(Zip<smallvec::IntoIter<[String; 8]>, smallvec::IntoIter<[Value; 8]>>);
 
 impl Iterator for PairsIntoIter {
     type Item = (String, Value);
@@ -172,8 +172,8 @@ where
     fn from_iter<I: IntoIterator<Item = (S, T)>>(iter: I) -> Tuple {
         let iterator = iter.into_iter();
         let (lower, _) = iterator.size_hint();
-        let mut attrs = Vec::with_capacity(lower);
-        let mut vals = Vec::with_capacity(lower);
+        let mut attrs = SmallVec::with_capacity(lower);
+        let mut vals = SmallVec::with_capacity(lower);
         for (k, v) in iterator {
             attrs.push(k.into());
             vals.push(v.into());

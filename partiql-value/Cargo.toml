@@ -40,6 +40,7 @@ typetag = { version = "0.2.21", optional = true }
 
 
 
+smallvec = "1.15.1"
 dyn-clone = "1.0.20"
 dyn-hash = "1.0.0"
 
@@ -53,5 +54,6 @@ serde = [
     "time/serde",
     "rust_decimal/serde-with-str",
     "rust_decimal/serde",
-    "ordered-float/serde"
+    "ordered-float/serde",
+    "smallvec/serde"
 ]
