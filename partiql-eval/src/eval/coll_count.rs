@@ -156,4 +156,64 @@ mod tests {
             other => panic!("Expected Bag result, got {:?}", other),
         }
     }
+
+    #[test]
+    fn test_count_with_where_skips_pushdown() {
+        // When bindings have rows (non-empty Bag), pushdown must be skipped
+        // because a WHERE filter may have reduced the rows.
+        use crate::plan::EvaluationMode;
+        use partiql_catalog::catalog::PartiqlCatalog;
+        use partiql_logical_planner::LogicalPlanner;
+        use partiql_parser::Parser;
+        use partiql_value::{Bag, Tuple};
+
+        let parser = Parser::default();
+        let shared_catalog = PartiqlCatalog::default().to_shared_catalog();
+
+        // 5 rows: 3 active, 2 inactive
+        let rows: Vec<Value> = (0..5)
+            .map(|i| {
+                let status = if i % 2 == 0 { "active" } else { "inactive" };
+                let mut t = Tuple::new();
+                t.insert("id", Value::from(i));
+                t.insert("status", Value::String(status.to_string().into()));
+                Value::from(t)
+            })
+            .collect();
+
+        let mut bindings = MapBindings::default();
+        bindings.insert("t", Value::Bag(Box::new(Bag::from(rows))));
+
+        let parsed = parser
+            .parse("SELECT COUNT(u) FROM t u WHERE u.status = 'active'")
+            .unwrap();
+        let planner = LogicalPlanner::new(&shared_catalog);
+        let logical = planner.lower(&parsed).unwrap();
+        let mut eval_planner =
+            crate::plan::EvaluatorPlanner::new(EvaluationMode::Permissive, &shared_catalog);
+        let eval_plan = eval_planner.compile(&logical).unwrap();
+
+        // Context says 1000 — but WHERE filters to 3. Pushdown must be skipped
+        // because input Bag is non-empty (5 rows before filter, 3 after).
+        let ctx = TestCountContext::new(bindings, 1000);
+        let result = eval_plan.execute(&ctx).unwrap();
+
+        match result.result {
+            Value::Bag(bag) => {
+                let values: Vec<_> = bag.iter().collect();
+                assert_eq!(values.len(), 1);
+                if let Value::Tuple(tuple) = &values[0] {
+                    let count_val = tuple.pairs().next().map(|(_, v)| v).unwrap();
+                    assert_eq!(
+                        count_val,
+                        &Value::Integer(3),
+                        "COUNT with WHERE must return 3 (filtered), not 1000 (pushdown)"
+                    );
+                } else {
+                    panic!("Expected Tuple, got {:?}", values[0]);
+                }
+            }
+            other => panic!("Expected Bag, got {:?}", other),
+        }
+    }
 }
