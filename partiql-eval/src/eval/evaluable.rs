@@ -669,30 +669,10 @@ impl Evaluable for EvalGroupBy {
                 Missing
             }
             EvalGroupingStrategy::GroupFull => {
-                // CollCount pushdown: if the only aggregate is COUNT (no DISTINCT),
-                // ask the context for an O(1) count instead of iterating all rows.
-                // Only safe when input size equals storage count — meaning no
-                // WHERE filter was applied upstream. If they differ, a filter ran
-                // and we must iterate the (possibly empty) filtered input.
-                if self.distinct_aggs.is_empty()
-                    && self.aggs.len() == 1
-                    && self.aggs[0].func.is_count()
-                {
-                    if let Some(counter) = ctx.as_coll_count() {
-                        let storage_count = counter.coll_count();
-                        let input_len = match &input_value {
-                            Value::Bag(b) => b.len(),
-                            Value::List(l) => l.len(),
-                            _ => 0,
-                        };
-                        if input_len == storage_count {
-                            let count_val = Value::from(storage_count as i64);
-                            let mut tuple = Tuple::new();
-                            tuple.insert(&self.aggs[0].name, count_val);
-                            return Value::from(Bag::from(vec![Value::from(tuple)]));
-                        }
-                    }
-                }
+                // NOTE: CollCount pushdown disabled — causes issues with SELECT VALUE COUNT(1)
+                // and parallel test execution. The trait infrastructure (CollCount, as_coll_count,
+                // FdeContext) is kept for future use when pushdown can be done at the FDE engine
+                // level before PartiQL evaluation.
 
                 let mut grouped: FxHashMap<GroupKey, CombinedState> = FxHashMap::default();
                 let state = std::iter::repeat_n(None, self.aggs.len()).collect_vec();
