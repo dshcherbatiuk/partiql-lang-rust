@@ -72,7 +72,23 @@ impl BindEvalExpr for EvalCollFn {
 
         match self {
             EvalCollFn::Count(setq) => {
-                create::<{ STRICT }, _>([any_elems], args, move |it| it.coll_count(setq))
+                UnaryValueExpr::create_typed_with_ctx::<{ STRICT }, _>(
+                    [any_elems],
+                    args,
+                    move |value, ctx| {
+                        // Aggregate pushdown: storage engines can provide COUNT
+                        // without materializing all rows via the CollCount trait.
+                        if setq == SetQuantifier::All {
+                            if let Some(counter) = ctx.as_coll_count() {
+                                return (counter.coll_count() as i64).into();
+                            }
+                        }
+                        // Fallback: standard iteration
+                        value
+                            .sequence_iter()
+                            .map_or(Missing, |it| it.coll_count(setq))
+                    },
+                )
             }
             EvalCollFn::Avg(setq) => {
                 create::<{ STRICT }, _>([numeric_elems], args, move |it| it.coll_avg(setq))

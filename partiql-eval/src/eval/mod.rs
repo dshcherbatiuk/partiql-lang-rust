@@ -14,6 +14,9 @@ use partiql_value::{BindingsName, Value};
 
 use crate::env::basic::MapBindings;
 
+pub mod coll_count;
+pub use coll_count::CollCount;
+
 use petgraph::graph::NodeIndex;
 
 use crate::error::{EvalErr, EvaluationError};
@@ -178,6 +181,12 @@ pub trait EvalContext: Bindings<Value> + SessionContext + Debug {
     fn add_error(&self, error: EvaluationError);
     fn has_errors(&self) -> bool;
     fn errors(&self) -> Vec<EvaluationError>;
+
+    /// Returns a [`CollCount`] implementation if the storage engine supports
+    /// aggregate pushdown for COUNT. Default: `None` — evaluator iterates.
+    fn as_coll_count(&self) -> Option<&dyn CollCount> {
+        None
+    }
 }
 
 #[derive(Debug)]
