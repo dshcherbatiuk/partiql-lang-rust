@@ -72,23 +72,9 @@ impl BindEvalExpr for EvalCollFn {
 
         match self {
             EvalCollFn::Count(setq) => {
-                UnaryValueExpr::create_typed_with_ctx::<{ STRICT }, _>(
-                    [any_elems],
-                    args,
-                    move |value, ctx| {
-                        // Aggregate pushdown: storage engines can provide COUNT
-                        // without materializing all rows via the CollCount trait.
-                        if setq == SetQuantifier::All {
-                            if let Some(counter) = ctx.as_coll_count() {
-                                return (counter.coll_count() as i64).into();
-                            }
-                        }
-                        // Fallback: standard iteration
-                        value
-                            .sequence_iter()
-                            .map_or(Missing, |it| it.coll_count(setq))
-                    },
-                )
+                // Note: pushdown is handled in EvalGroupBy, not here.
+                // COLL_COUNT operates on individual values, not the FROM source.
+                create::<{ STRICT }, _>([any_elems], args, move |it| it.coll_count(setq))
             }
             EvalCollFn::Avg(setq) => {
                 create::<{ STRICT }, _>([numeric_elems], args, move |it| it.coll_avg(setq))

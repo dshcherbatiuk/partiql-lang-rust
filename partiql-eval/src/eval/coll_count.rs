@@ -287,4 +287,53 @@ mod tests {
             other => panic!("Expected Bag, got {:?}", other),
         }
     }
+
+    #[test]
+    fn test_select_value_count_1_not_affected_by_pushdown() {
+        // SELECT VALUE COUNT(1) FROM t goes through COLL_COUNT, not EvalGroupBy.
+        // Pushdown must NOT fire — COLL_COUNT counts individual values, not the source.
+        use crate::plan::EvaluationMode;
+        use partiql_catalog::catalog::PartiqlCatalog;
+        use partiql_logical_planner::LogicalPlanner;
+        use partiql_parser::Parser;
+        use partiql_value::{Bag, Tuple};
+
+        let parser = Parser::default();
+        let shared_catalog = PartiqlCatalog::default().to_shared_catalog();
+
+        let rows: Vec<Value> = (0..3)
+            .map(|i| {
+                let mut t = Tuple::new();
+                t.insert("event_id", Value::String(format!("evt-{i}").into()));
+                Value::from(t)
+            })
+            .collect();
+
+        let mut bindings = MapBindings::default();
+        bindings.insert("events", Value::Bag(Box::new(Bag::from(rows))));
+
+        let parsed = parser.parse("SELECT VALUE COUNT(1) FROM events").unwrap();
+        let planner = LogicalPlanner::new(&shared_catalog);
+        let logical = planner.lower(&parsed).unwrap();
+        let mut eval_planner =
+            crate::plan::EvaluatorPlanner::new(EvaluationMode::Permissive, &shared_catalog);
+        let eval_plan = eval_planner.compile(&logical).unwrap();
+
+        // Context says 999 — but COUNT(1) must return 3 (row count from iteration)
+        let ctx = TestCountContext::new(bindings, 999);
+        let result = eval_plan.execute(&ctx).unwrap();
+
+        match result.result {
+            Value::Bag(bag) => {
+                let values: Vec<_> = bag.iter().collect();
+                assert_eq!(values.len(), 1, "Should have one result");
+                assert_eq!(
+                    values[0],
+                    &Value::Integer(3),
+                    "SELECT VALUE COUNT(1) must return 3 (actual rows), not 999 (pushdown)"
+                );
+            }
+            other => panic!("Expected Bag, got {:?}", other),
+        }
+    }
 }
