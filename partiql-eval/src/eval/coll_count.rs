@@ -110,19 +110,26 @@ mod tests {
     #[test]
     fn test_count_pushdown_via_eval_plan() {
         // Full integration: parse + plan + execute SELECT COUNT(u) FROM t u
-        // with a TestCountContext that returns 100, even though bindings are empty.
+        // with a TestCountContext that returns 100 matching the input size.
         use crate::plan::EvaluationMode;
-        use partiql_catalog::catalog::{PartiqlCatalog, PartiqlSharedCatalog};
+        use partiql_catalog::catalog::PartiqlCatalog;
         use partiql_logical_planner::LogicalPlanner;
         use partiql_parser::Parser;
-        use partiql_value::Bag;
+        use partiql_value::{Bag, Tuple};
 
         let parser = Parser::default();
         let shared_catalog = PartiqlCatalog::default().to_shared_catalog();
 
-        // Empty bindings — no rows materialized
+        // Bindings with 100 rows — matching the pushdown count
+        let rows: Vec<Value> = (0..100)
+            .map(|i| {
+                let mut t = Tuple::new();
+                t.insert("id", Value::from(i));
+                Value::from(t)
+            })
+            .collect();
         let mut bindings = MapBindings::default();
-        bindings.insert("t", Value::Bag(Box::new(Bag::from(vec![]))));
+        bindings.insert("t", Value::Bag(Box::new(Bag::from(rows))));
 
         let parsed = parser.parse("SELECT COUNT(u) FROM t u").unwrap();
         let planner = LogicalPlanner::new(&shared_catalog);
@@ -131,8 +138,8 @@ mod tests {
             crate::plan::EvaluatorPlanner::new(EvaluationMode::Permissive, &shared_catalog);
         let eval_plan = eval_planner.compile(&logical).unwrap();
 
-        // Execute with pushdown context — should return 100 from CollCount,
-        // NOT 0 from the empty Bag
+        // Execute with pushdown context — input_len (100) == storage_count (100),
+        // so pushdown fires and returns 100 without iterating
         let ctx = TestCountContext::new(bindings, 100);
         let result = eval_plan.execute(&ctx).unwrap();
 
@@ -212,6 +219,70 @@ mod tests {
                 } else {
                     panic!("Expected Tuple, got {:?}", values[0]);
                 }
+            }
+            other => panic!("Expected Bag, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_count_where_filters_all_rows_must_return_zero() {
+        // WHERE filters ALL rows → empty input. Pushdown must NOT fire —
+        // should return 0, not the storage count.
+        use crate::plan::EvaluationMode;
+        use partiql_catalog::catalog::PartiqlCatalog;
+        use partiql_logical_planner::LogicalPlanner;
+        use partiql_parser::Parser;
+        use partiql_value::{Bag, Tuple};
+
+        let parser = Parser::default();
+        let shared_catalog = PartiqlCatalog::default().to_shared_catalog();
+
+        // 3 rows, all with type = 'test-event'
+        let rows: Vec<Value> = (0..3)
+            .map(|i| {
+                let mut t = Tuple::new();
+                t.insert("event_id", Value::String(format!("evt-{i}").into()));
+                t.insert("type", Value::String("test-event".to_string().into()));
+                Value::from(t)
+            })
+            .collect();
+
+        let mut bindings = MapBindings::default();
+        bindings.insert("events", Value::Bag(Box::new(Bag::from(rows))));
+
+        // WHERE filters ALL rows (no 'NonExistent' type exists)
+        let parsed = parser
+            .parse("SELECT VALUE count(1) FROM events e WHERE e.type = 'NonExistent'")
+            .unwrap();
+        let planner = LogicalPlanner::new(&shared_catalog);
+        let logical = planner.lower(&parsed).unwrap();
+        let mut eval_planner =
+            crate::plan::EvaluatorPlanner::new(EvaluationMode::Permissive, &shared_catalog);
+        let eval_plan = eval_planner.compile(&logical).unwrap();
+
+        // Context says 3 (storage has 3 rows). But WHERE removes all → must return 0.
+        let ctx = TestCountContext::new(bindings, 3);
+        let result = eval_plan.execute(&ctx).unwrap();
+
+        // When WHERE filters all rows, PartiQL returns empty Bag <<>> for SELECT VALUE,
+        // not <<0>>. The key assertion: pushdown must NOT return <<3>> (storage count).
+        match result.result {
+            Value::Bag(bag) => {
+                let values: Vec<_> = bag.iter().collect();
+                // Either empty (PartiQL default for no groups) or <<0>> — both correct.
+                // Must NOT be <<3>> (storage count from pushdown).
+                if !values.is_empty() {
+                    assert_eq!(
+                        values[0],
+                        &Value::Integer(0),
+                        "If COUNT result present, must be 0, not 3 (storage count)"
+                    );
+                }
+                // Verify pushdown did NOT fire with wrong value
+                assert!(
+                    values.is_empty() || values[0] == &Value::Integer(0),
+                    "Must not return storage count (3) when WHERE filters all rows"
+                );
             }
             other => panic!("Expected Bag, got {:?}", other),
         }

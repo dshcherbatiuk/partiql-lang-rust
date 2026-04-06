@@ -671,22 +671,22 @@ impl Evaluable for EvalGroupBy {
             EvalGroupingStrategy::GroupFull => {
                 // CollCount pushdown: if the only aggregate is COUNT (no DISTINCT),
                 // ask the context for an O(1) count instead of iterating all rows.
-                // Only safe when no WHERE filter was applied upstream — an empty input
-                // Bag with a non-zero pushdown count means the storage skipped
-                // materialization. A non-empty input means rows were materialized
-                // (possibly after WHERE filtering) — iterate normally.
+                // Only safe when input size equals storage count — meaning no
+                // WHERE filter was applied upstream. If they differ, a filter ran
+                // and we must iterate the (possibly empty) filtered input.
                 if self.distinct_aggs.is_empty()
                     && self.aggs.len() == 1
                     && self.aggs[0].func.is_count()
                 {
-                    let input_is_empty = match &input_value {
-                        Value::Bag(b) => b.is_empty(),
-                        Value::List(l) => l.is_empty(),
-                        _ => true,
-                    };
-                    if input_is_empty {
-                        if let Some(counter) = ctx.as_coll_count() {
-                            let count_val = Value::from(counter.coll_count() as i64);
+                    if let Some(counter) = ctx.as_coll_count() {
+                        let storage_count = counter.coll_count();
+                        let input_len = match &input_value {
+                            Value::Bag(b) => b.len(),
+                            Value::List(l) => l.len(),
+                            _ => 0,
+                        };
+                        if input_len == storage_count {
+                            let count_val = Value::from(storage_count as i64);
                             let mut tuple = Tuple::new();
                             tuple.insert(&self.aggs[0].name, count_val);
                             return Value::from(Bag::from(vec![Value::from(tuple)]));
