@@ -383,6 +383,11 @@ impl AggregateFunction for AggregateExpression {
 
 /// Represents an SQL aggregation function computed on a collection of input values.
 pub trait AggregateFunction: Debug {
+    /// Returns true if this is a COUNT aggregate (for pushdown optimization).
+    fn is_count(&self) -> bool {
+        false
+    }
+
     #[inline]
     fn next_distinct(
         &self,
@@ -453,6 +458,10 @@ impl AggregateFunction for Avg {
 pub(crate) struct Count {}
 
 impl AggregateFunction for Count {
+    fn is_count(&self) -> bool {
+        true
+    }
+
     fn next_value(&self, _: &Value, state: &mut Option<Value>) {
         match state {
             None => *state = Some(Value::from(1)),
@@ -660,6 +669,20 @@ impl Evaluable for EvalGroupBy {
                 Missing
             }
             EvalGroupingStrategy::GroupFull => {
+                // CollCount pushdown: if the only aggregate is COUNT (no DISTINCT),
+                // ask the context for an O(1) count instead of iterating all rows.
+                if self.distinct_aggs.is_empty()
+                    && self.aggs.len() == 1
+                    && self.aggs[0].func.is_count()
+                {
+                    if let Some(counter) = ctx.as_coll_count() {
+                        let count_val = Value::from(counter.coll_count() as i64);
+                        let mut tuple = Tuple::new();
+                        tuple.insert(&self.aggs[0].name, count_val);
+                        return Value::from(Bag::from(vec![Value::from(tuple)]));
+                    }
+                }
+
                 let mut grouped: FxHashMap<GroupKey, CombinedState> = FxHashMap::default();
                 let state = std::iter::repeat_n(None, self.aggs.len()).collect_vec();
                 let distinct_state = std::iter::repeat_with(|| (None, FxHashMap::default()))
