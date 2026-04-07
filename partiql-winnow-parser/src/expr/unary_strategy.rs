@@ -39,3 +39,28 @@ impl ExprStrategy for UnaryStrategy {
         "Unary"
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::expr::ExprChain;
+    use partiql_ast::ast;
+    use partiql_ast::ast::UniOpKind;
+
+    fn parse(input: &str) -> ast::Expr {
+        let chain = ExprChain::new();
+        let mut i = input;
+        chain.parse_expr(&mut i).expect("parse failed")
+    }
+
+    #[test]
+    fn test_unary_neg() {
+        let expr = parse("-5");
+        assert!(matches!(&expr, ast::Expr::UniOp(n) if n.node.kind == UniOpKind::Neg));
+    }
+
+    #[test]
+    fn test_unary_pos() {
+        let expr = parse("+5");
+        assert!(matches!(&expr, ast::Expr::UniOp(n) if n.node.kind == UniOpKind::Pos));
+    }
+}

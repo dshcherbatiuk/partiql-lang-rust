@@ -32,3 +32,53 @@ impl ExprStrategy for OrStrategy {
         "Or"
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::expr::ExprChain;
+    use partiql_ast::ast;
+    use partiql_ast::ast::BinOpKind;
+
+    fn parse(input: &str) -> ast::Expr {
+        let chain = ExprChain::new();
+        let mut i = input;
+        chain.parse_expr(&mut i).expect("parse failed")
+    }
+
+    #[test]
+    fn test_simple_or() {
+        let expr = parse("1 OR 2");
+        assert!(matches!(&expr, ast::Expr::BinOp(n) if n.node.kind == BinOpKind::Or));
+    }
+
+    #[test]
+    fn test_multiple_ors() {
+        // 1 OR 2 OR 3 => left-associative: (1 OR 2) OR 3
+        let expr = parse("1 OR 2 OR 3");
+        match &expr {
+            ast::Expr::BinOp(n) => {
+                assert_eq!(n.node.kind, BinOpKind::Or);
+                // lhs should also be an OR
+                assert!(
+                    matches!(&*n.node.lhs, ast::Expr::BinOp(inner) if inner.node.kind == BinOpKind::Or)
+                );
+            }
+            _ => panic!("expected BinOp"),
+        }
+    }
+
+    #[test]
+    fn test_or_with_and_precedence() {
+        // 1 AND 2 OR 3 => (1 AND 2) OR 3
+        let expr = parse("1 AND 2 OR 3");
+        match &expr {
+            ast::Expr::BinOp(n) => {
+                assert_eq!(n.node.kind, BinOpKind::Or);
+                assert!(
+                    matches!(&*n.node.lhs, ast::Expr::BinOp(inner) if inner.node.kind == BinOpKind::And)
+                );
+            }
+            _ => panic!("expected BinOp"),
+        }
+    }
+}

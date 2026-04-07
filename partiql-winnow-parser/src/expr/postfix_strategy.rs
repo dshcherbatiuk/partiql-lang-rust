@@ -53,3 +53,53 @@ impl ExprStrategy for PostfixStrategy {
         "Postfix"
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::expr::ExprChain;
+    use partiql_ast::ast;
+
+    fn parse(input: &str) -> ast::Expr {
+        let chain = ExprChain::new();
+        let mut i = input;
+        chain.parse_expr(&mut i).expect("parse failed")
+    }
+
+    #[test]
+    fn test_dot_access() {
+        // a.b => Path with one step
+        let expr = parse("a.b");
+        assert!(matches!(&expr, ast::Expr::Path(_)));
+    }
+
+    #[test]
+    fn test_chained_dot_access() {
+        // a.b.c => Path with two steps
+        let expr = parse("a.b.c");
+        match &expr {
+            ast::Expr::Path(n) => {
+                assert_eq!(n.node.steps.len(), 2);
+            }
+            _ => panic!("expected Path"),
+        }
+    }
+
+    #[test]
+    fn test_bracket_access() {
+        // a[0] => Path with one index step
+        let expr = parse("a[0]");
+        assert!(matches!(&expr, ast::Expr::Path(_)));
+    }
+
+    #[test]
+    fn test_mixed_access() {
+        // a.b[0].c => Path with three steps
+        let expr = parse("a.b[0].c");
+        match &expr {
+            ast::Expr::Path(n) => {
+                assert_eq!(n.node.steps.len(), 3);
+            }
+            _ => panic!("expected Path"),
+        }
+    }
+}

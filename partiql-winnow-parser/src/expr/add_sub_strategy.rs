@@ -43,3 +43,49 @@ impl ExprStrategy for AddSubStrategy {
         "AddSub"
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::expr::ExprChain;
+    use partiql_ast::ast;
+    use partiql_ast::ast::BinOpKind;
+
+    fn parse(input: &str) -> ast::Expr {
+        let chain = ExprChain::new();
+        let mut i = input;
+        chain.parse_expr(&mut i).expect("parse failed")
+    }
+
+    #[test]
+    fn test_add() {
+        let expr = parse("1 + 2");
+        assert!(matches!(&expr, ast::Expr::BinOp(n) if n.node.kind == BinOpKind::Add));
+    }
+
+    #[test]
+    fn test_sub() {
+        let expr = parse("3 - 1");
+        assert!(matches!(&expr, ast::Expr::BinOp(n) if n.node.kind == BinOpKind::Sub));
+    }
+
+    #[test]
+    fn test_concat() {
+        let expr = parse("'a' || 'b'");
+        assert!(matches!(&expr, ast::Expr::BinOp(n) if n.node.kind == BinOpKind::Concat));
+    }
+
+    #[test]
+    fn test_chained_additions() {
+        // 1 + 2 + 3 => left-associative: (1 + 2) + 3
+        let expr = parse("1 + 2 + 3");
+        match &expr {
+            ast::Expr::BinOp(n) => {
+                assert_eq!(n.node.kind, BinOpKind::Add);
+                assert!(
+                    matches!(&*n.node.lhs, ast::Expr::BinOp(inner) if inner.node.kind == BinOpKind::Add)
+                );
+            }
+            _ => panic!("expected BinOp"),
+        }
+    }
+}

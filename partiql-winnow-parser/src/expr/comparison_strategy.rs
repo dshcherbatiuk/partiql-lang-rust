@@ -55,3 +55,58 @@ impl ExprStrategy for ComparisonStrategy {
         "Comparison"
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::expr::ExprChain;
+    use partiql_ast::ast;
+    use partiql_ast::ast::BinOpKind;
+
+    fn parse(input: &str) -> ast::Expr {
+        let chain = ExprChain::new();
+        let mut i = input;
+        chain.parse_expr(&mut i).expect("parse failed")
+    }
+
+    #[test]
+    fn test_eq() {
+        let expr = parse("a = 1");
+        assert!(matches!(&expr, ast::Expr::BinOp(n) if n.node.kind == BinOpKind::Eq));
+    }
+
+    #[test]
+    fn test_ne_bang() {
+        let expr = parse("a != 1");
+        assert!(matches!(&expr, ast::Expr::BinOp(n) if n.node.kind == BinOpKind::Ne));
+    }
+
+    #[test]
+    fn test_ne_diamond() {
+        let expr = parse("a <> 1");
+        assert!(matches!(&expr, ast::Expr::BinOp(n) if n.node.kind == BinOpKind::Ne));
+    }
+
+    #[test]
+    fn test_lt() {
+        let expr = parse("a < 1");
+        assert!(matches!(&expr, ast::Expr::BinOp(n) if n.node.kind == BinOpKind::Lt));
+    }
+
+    #[test]
+    fn test_gt() {
+        let expr = parse("a > 1");
+        assert!(matches!(&expr, ast::Expr::BinOp(n) if n.node.kind == BinOpKind::Gt));
+    }
+
+    #[test]
+    fn test_lte() {
+        let expr = parse("a <= 1");
+        assert!(matches!(&expr, ast::Expr::BinOp(n) if n.node.kind == BinOpKind::Lte));
+    }
+
+    #[test]
+    fn test_gte() {
+        let expr = parse("a >= 1");
+        assert!(matches!(&expr, ast::Expr::BinOp(n) if n.node.kind == BinOpKind::Gte));
+    }
+}
