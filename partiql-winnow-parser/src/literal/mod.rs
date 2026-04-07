@@ -40,12 +40,8 @@
 //! offset    ::= 'Z' | ('+' | '-') HH ':' MM
 //! ```
 
-pub mod annotation;
 pub mod boolean_strategy;
-pub mod ion_null;
-pub mod ion_number;
-pub mod ion_string;
-pub mod ion_timestamp;
+pub mod ion;
 pub mod null_strategy;
 pub mod number_strategy;
 pub mod string_strategy;

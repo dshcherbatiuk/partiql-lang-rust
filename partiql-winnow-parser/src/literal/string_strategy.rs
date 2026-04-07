@@ -1,6 +1,6 @@
 //! StringLiteralStrategy — SQL `'hello'` or Ion `"hello"`.
 
-use super::ion_string;
+use super::ion::string;
 use super::LiteralStrategy;
 use crate::expr::StrategyContext;
 use partiql_ast::ast;
@@ -12,7 +12,7 @@ pub struct StringLiteralStrategy;
 
 impl LiteralStrategy for StringLiteralStrategy {
     fn parse<'a>(&self, input: &mut &'a str, ctx: &StrategyContext<'_>) -> PResult<ast::Expr> {
-        let s = alt((ion_string::sql_string, ion_string::ion_string)).parse_next(input)?;
+        let s = alt((string::sql_string, string::ion_string)).parse_next(input)?;
         Ok(ast::Expr::Lit(ctx.node(Lit::CharStringLit(s))))
     }
 
