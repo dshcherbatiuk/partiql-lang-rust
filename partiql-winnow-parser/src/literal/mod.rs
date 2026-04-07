@@ -41,7 +41,22 @@
 //! ```
 
 pub mod annotation;
+pub mod boolean_strategy;
 pub mod ion_null;
 pub mod ion_number;
 pub mod ion_string;
 pub mod ion_timestamp;
+pub mod null_strategy;
+pub mod number_strategy;
+pub mod string_strategy;
+
+use crate::expr::StrategyContext;
+use partiql_ast::ast;
+use winnow::prelude::*;
+
+/// Strategy trait for literal parsing. Each Ion/SQL literal type
+/// implements this. Used by PrimaryStrategy's internal chain.
+pub trait LiteralStrategy {
+    fn parse<'a>(&self, input: &mut &'a str, ctx: &StrategyContext<'_>) -> PResult<ast::Expr>;
+    fn name(&self) -> &str;
+}

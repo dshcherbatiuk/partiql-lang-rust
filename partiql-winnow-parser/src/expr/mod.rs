@@ -22,16 +22,20 @@
 pub mod primary_strategy;
 
 use partiql_ast::ast;
+use partiql_ast::ast::AstNode;
+use partiql_common::node::{AutoNodeIdGenerator, NodeIdGenerator};
+use std::cell::RefCell;
 use winnow::prelude::*;
 
-/// Context passed to each strategy — provides access to the chain
-/// and current level. Stack-allocated, 16 bytes, zero heap.
+/// Context passed to each strategy — provides access to the chain,
+/// current precedence level, and a node ID generator for AST construction.
 ///
-/// Extensible: future fields (location tracker, error state) added
-/// here without changing the strategy trait signature.
+/// Stack-allocated reference. Extensible: add location tracker, error
+/// state, etc. without changing the strategy trait signature.
 pub struct StrategyContext<'c> {
     chain: &'c ExprChain,
     level: usize,
+    ids: &'c RefCell<AutoNodeIdGenerator>,
 }
 
 impl<'c> StrategyContext<'c> {
@@ -47,6 +51,15 @@ impl<'c> StrategyContext<'c> {
     pub fn parse_expr<'a>(&self, input: &mut &'a str) -> PResult<ast::Expr> {
         self.chain.parse_expr(input)
     }
+
+    /// Create an AST node with a fresh ID.
+    #[inline]
+    pub fn node<T>(&self, value: T) -> AstNode<T> {
+        AstNode {
+            id: self.ids.borrow_mut().next_id(),
+            node: value,
+        }
+    }
 }
 
 /// Each precedence level implements this trait.
@@ -60,18 +73,24 @@ pub trait ExprStrategy {
 /// Chain of expression strategies in precedence order (lowest → highest).
 pub struct ExprChain {
     strategies: Vec<Box<dyn ExprStrategy>>,
+    ids: RefCell<AutoNodeIdGenerator>,
 }
 
 impl ExprChain {
     pub fn new() -> Self {
         Self {
-            strategies: vec![Box::new(primary_strategy::PrimaryStrategy)],
+            strategies: vec![Box::new(primary_strategy::PrimaryStrategy::new())],
+            ids: RefCell::new(AutoNodeIdGenerator::default()),
         }
     }
 
     /// Parse at the given precedence level.
     pub fn parse_at<'a>(&self, input: &mut &'a str, level: usize) -> PResult<ast::Expr> {
-        let ctx = StrategyContext { chain: self, level };
+        let ctx = StrategyContext {
+            chain: self,
+            level,
+            ids: &self.ids,
+        };
         self.strategies[level].parse(input, &ctx)
     }
 
