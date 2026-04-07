@@ -37,7 +37,7 @@ use winnow::token::take_while;
 ///
 /// Supports full Ion escape sequences: `\\`, `\"`, `\n`, `\t`, `\uXXXX`, etc.
 // BNF: short_string ::= '"' (char | escape)* '"'
-pub fn ion_string<'a>(input: &mut &'a str) -> PResult<String> {
+pub fn ion_string(input: &mut &str) -> PResult<String> {
     let _ = '"'.parse_next(input)?;
     let mut result = String::new();
     loop {
@@ -64,7 +64,7 @@ pub fn ion_string<'a>(input: &mut &'a str) -> PResult<String> {
 /// SQL strings escape single quotes by doubling: `''` → `'`.
 /// No backslash escapes — backslash is a literal character.
 // BNF: sql_string ::= "'" ([^'] | "''")* "'"
-pub fn sql_string<'a>(input: &mut &'a str) -> PResult<String> {
+pub fn sql_string(input: &mut &str) -> PResult<String> {
     let _ = '\''.parse_next(input)?;
     let mut result = String::new();
     loop {
@@ -83,7 +83,7 @@ pub fn sql_string<'a>(input: &mut &'a str) -> PResult<String> {
 }
 
 /// Parse a single escape character after `\`.
-fn parse_escape_char<'a>(input: &mut &'a str) -> PResult<char> {
+pub(crate) fn parse_escape_char(input: &mut &str) -> PResult<char> {
     let c = winnow::token::any.parse_next(input)?;
     match c {
         '\\' => Ok('\\'),
@@ -108,7 +108,7 @@ fn parse_escape_char<'a>(input: &mut &'a str) -> PResult<char> {
 }
 
 /// Parse N hex digits and convert to a char.
-fn parse_hex_escape<'a>(input: &mut &'a str, digits: usize) -> PResult<char> {
+fn parse_hex_escape(input: &mut &str, digits: usize) -> PResult<char> {
     let hex = winnow::token::take(digits).parse_next(input)?;
     let code = u32::from_str_radix(hex, 16)
         .map_err(|_| winnow::error::ErrMode::Backtrack(winnow::error::ContextError::new()))?;
