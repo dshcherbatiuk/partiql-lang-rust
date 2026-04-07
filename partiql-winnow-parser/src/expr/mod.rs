@@ -5,7 +5,7 @@
 //!
 //! ```text
 //! ┌───────────────────────────────────────────────────────┐
-//! │ ExprChain                                             │
+//! │ ExprChain (stateless — created once, reused)         │
 //! │                                                       │
 //! │  [0] OrStrategy          ← entry point (lowest prec) │
 //! │  [1] AndStrategy                                      │
@@ -30,58 +30,50 @@ pub mod primary_strategy;
 pub mod unary_strategy;
 
 use partiql_ast::ast;
-use partiql_ast::ast::AstNode;
-use partiql_common::node::{AutoNodeIdGenerator, NodeIdGenerator};
-use std::cell::RefCell;
 use winnow::prelude::*;
 
+use crate::parse_context::ParseContext;
+
 /// Context passed to each strategy — provides access to the chain,
-/// current precedence level, and a node ID generator for AST construction.
+/// current precedence level, and shared parse state.
 ///
-/// Stack-allocated reference. Extensible: add location tracker, error
-/// state, etc. without changing the strategy trait signature.
+/// Stack-allocated reference. Strategies use this to delegate to
+/// next levels and create AST nodes.
 pub struct StrategyContext<'c> {
     chain: &'c ExprChain,
     level: usize,
-    ids: &'c RefCell<AutoNodeIdGenerator>,
+    pub(crate) parse_ctx: &'c ParseContext,
 }
 
 impl<'c> StrategyContext<'c> {
     /// Parse a sub-expression at the next (higher-precedence) level.
     #[inline]
     pub fn parse_next_level<'a>(&self, input: &mut &'a str) -> PResult<ast::Expr> {
-        self.chain.parse_at(input, self.level + 1)
+        self.chain.parse_at(input, self.level + 1, self.parse_ctx)
     }
 
     /// Parse a full expression from the lowest precedence level.
-    /// Used for sub-expressions in parentheses, function args, etc.
     #[inline]
     pub fn parse_expr<'a>(&self, input: &mut &'a str) -> PResult<ast::Expr> {
-        self.chain.parse_expr(input)
+        self.chain.parse_expr(input, self.parse_ctx)
     }
 
     /// Create an AST node with a fresh ID.
     #[inline]
-    pub fn node<T>(&self, value: T) -> AstNode<T> {
-        AstNode {
-            id: self.ids.borrow_mut().next_id(),
-            node: value,
-        }
+    pub fn node<T>(&self, value: T) -> ast::AstNode<T> {
+        self.parse_ctx.node(value)
     }
 }
 
 /// Each precedence level implements this trait.
 pub trait ExprStrategy {
-    /// Parse at this precedence level.
     fn parse<'a>(&self, input: &mut &'a str, ctx: &StrategyContext<'_>) -> PResult<ast::Expr>;
-
     fn name(&self) -> &str;
 }
 
-/// Chain of expression strategies in precedence order (lowest → highest).
+/// Chain of expression strategies — stateless, created once, reused.
 pub struct ExprChain {
     strategies: Vec<Box<dyn ExprStrategy>>,
-    ids: RefCell<AutoNodeIdGenerator>,
 }
 
 impl ExprChain {
@@ -98,23 +90,31 @@ impl ExprChain {
                 Box::new(postfix_strategy::PostfixStrategy),
                 Box::new(primary_strategy::PrimaryStrategy::new()),
             ],
-            ids: RefCell::new(AutoNodeIdGenerator::default()),
         }
     }
 
     /// Parse at the given precedence level.
-    pub fn parse_at<'a>(&self, input: &mut &'a str, level: usize) -> PResult<ast::Expr> {
+    pub fn parse_at<'a>(
+        &self,
+        input: &mut &'a str,
+        level: usize,
+        parse_ctx: &ParseContext,
+    ) -> PResult<ast::Expr> {
         let ctx = StrategyContext {
             chain: self,
             level,
-            ids: &self.ids,
+            parse_ctx,
         };
         self.strategies[level].parse(input, &ctx)
     }
 
-    /// Entry point: parse a full expression at the lowest precedence.
-    pub fn parse_expr<'a>(&self, input: &mut &'a str) -> PResult<ast::Expr> {
-        self.parse_at(input, 0)
+    /// Parse a full expression at the lowest precedence.
+    pub fn parse_expr<'a>(
+        &self,
+        input: &mut &'a str,
+        parse_ctx: &ParseContext,
+    ) -> PResult<ast::Expr> {
+        self.parse_at(input, 0, parse_ctx)
     }
 }
 

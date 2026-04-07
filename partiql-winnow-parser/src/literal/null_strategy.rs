@@ -31,8 +31,9 @@ mod tests {
 
     fn parse(input: &str) -> ast::Expr {
         let chain = ExprChain::new();
+        let pctx = crate::parse_context::ParseContext::new();
         let mut i = input;
-        chain.parse_expr(&mut i).expect("parse failed")
+        chain.parse_expr(&mut i, &pctx).expect("parse failed")
     }
 
     #[test]

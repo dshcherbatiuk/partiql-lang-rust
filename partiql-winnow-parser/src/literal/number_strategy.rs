@@ -32,8 +32,9 @@ mod tests {
 
     fn parse(input: &str) -> ast::Expr {
         let chain = ExprChain::new();
+        let pctx = crate::parse_context::ParseContext::new();
         let mut i = input;
-        chain.parse_expr(&mut i).expect("parse failed")
+        chain.parse_expr(&mut i, &pctx).expect("parse failed")
     }
 
     #[test]
@@ -71,8 +72,9 @@ mod tests {
         // Negative numbers go through unary minus, so the literal is positive
         // and wrapped in a unary negation. We verify the expression parses.
         let chain = ExprChain::new();
+        let pctx = crate::parse_context::ParseContext::new();
         let mut i = "-42";
-        let expr = chain.parse_expr(&mut i).expect("parse failed");
+        let expr = chain.parse_expr(&mut i, &pctx).expect("parse failed");
         // -42 may parse as unary minus on 42, or as a negative literal
         match expr {
             ast::Expr::Lit(n) => assert!(matches!(n.node, Lit::Int64Lit(-42))),

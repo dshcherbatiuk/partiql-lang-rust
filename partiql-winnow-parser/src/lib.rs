@@ -10,4 +10,6 @@ pub mod expr;
 mod identifier;
 mod keyword;
 mod literal;
+pub mod parse_context;
+pub mod select;
 mod whitespace;
