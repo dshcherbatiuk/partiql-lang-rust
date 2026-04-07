@@ -47,6 +47,19 @@ pub fn kw<'a>(keyword: &'static str) -> impl Parser<&'a str, &'a str, ContextErr
     winnow::ascii::Caseless(keyword)
 }
 
+/// Match a single character with explicit error type.
+/// Avoids winnow type inference issues with bare char literals.
+#[inline]
+pub fn ch<'a>(c: char) -> impl Parser<&'a str, char, ContextError> {
+    winnow::token::one_of(c)
+}
+
+/// Match an exact string with explicit error type.
+#[inline]
+pub fn lit<'a>(s: &'static str) -> impl Parser<&'a str, &'a str, ContextError> {
+    winnow::token::literal(s)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

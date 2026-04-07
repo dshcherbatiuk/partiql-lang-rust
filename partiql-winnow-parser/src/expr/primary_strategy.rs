@@ -203,4 +203,106 @@ mod tests {
             ast::Expr::Lit(n) if matches!(n.node, Lit::DecimalLit(_))
         ));
     }
+
+    // ── Expression chain tests (all strategies) ──────────────
+
+    #[test]
+    fn test_addition() {
+        let e = parse("1 + 2");
+        assert!(matches!(e, ast::Expr::BinOp(_)));
+    }
+
+    #[test]
+    fn test_subtraction() {
+        let e = parse("5 - 3");
+        assert!(matches!(e, ast::Expr::BinOp(_)));
+    }
+
+    #[test]
+    fn test_multiplication() {
+        let e = parse("2 * 3");
+        assert!(matches!(e, ast::Expr::BinOp(_)));
+    }
+
+    #[test]
+    fn test_comparison_eq() {
+        let e = parse("a = 1");
+        assert!(matches!(e, ast::Expr::BinOp(_)));
+    }
+
+    #[test]
+    fn test_comparison_neq() {
+        let e = parse("a != 1");
+        assert!(matches!(e, ast::Expr::BinOp(_)));
+    }
+
+    #[test]
+    fn test_and() {
+        let e = parse("a = 1 AND b = 2");
+        assert!(matches!(e, ast::Expr::BinOp(_)));
+    }
+
+    #[test]
+    fn test_or() {
+        let e = parse("a = 1 OR b = 2");
+        assert!(matches!(e, ast::Expr::BinOp(_)));
+    }
+
+    #[test]
+    fn test_not() {
+        let e = parse("NOT true");
+        assert!(matches!(e, ast::Expr::UniOp(_)));
+    }
+
+    #[test]
+    fn test_path_dot() {
+        let e = parse("a.b");
+        assert!(matches!(e, ast::Expr::Path(_)));
+    }
+
+    #[test]
+    fn test_path_bracket() {
+        let e = parse("a[0]");
+        assert!(matches!(e, ast::Expr::Path(_)));
+    }
+
+    #[test]
+    fn test_precedence_mul_over_add() {
+        // 1 + 2 * 3 should parse as 1 + (2 * 3)
+        let e = parse("1 + 2 * 3");
+        if let ast::Expr::BinOp(node) = &e {
+            assert_eq!(node.node.kind, ast::BinOpKind::Add);
+            assert!(matches!(*node.node.rhs, ast::Expr::BinOp(_)));
+        } else {
+            panic!("Expected BinOp, got {:?}", e);
+        }
+    }
+
+    #[test]
+    fn test_precedence_and_over_or() {
+        // a OR b AND c should parse as a OR (b AND c)
+        let e = parse("a OR b AND c");
+        if let ast::Expr::BinOp(node) = &e {
+            assert_eq!(node.node.kind, ast::BinOpKind::Or);
+        } else {
+            panic!("Expected BinOp(Or), got {:?}", e);
+        }
+    }
+
+    #[test]
+    fn test_concat() {
+        let e = parse("'a' || 'b'");
+        if let ast::Expr::BinOp(node) = &e {
+            assert_eq!(node.node.kind, ast::BinOpKind::Concat);
+        } else {
+            panic!("Expected Concat");
+        }
+    }
+
+    #[test]
+    fn test_complex_where() {
+        // Real FDE query pattern
+        let e = parse("u.email = 'test@co.com' AND p.originalPlatformId = 'GChat'");
+        assert!(matches!(e, ast::Expr::BinOp(_)));
+    }
 }

@@ -19,7 +19,15 @@
 //! └───────────────────────────────────────────────────────┘
 //! ```
 
+pub mod add_sub_strategy;
+pub mod and_strategy;
+pub mod comparison_strategy;
+pub mod mul_div_strategy;
+pub mod not_strategy;
+pub mod or_strategy;
+pub mod postfix_strategy;
 pub mod primary_strategy;
+pub mod unary_strategy;
 
 use partiql_ast::ast;
 use partiql_ast::ast::AstNode;
@@ -79,7 +87,17 @@ pub struct ExprChain {
 impl ExprChain {
     pub fn new() -> Self {
         Self {
-            strategies: vec![Box::new(primary_strategy::PrimaryStrategy::new())],
+            strategies: vec![
+                Box::new(or_strategy::OrStrategy),
+                Box::new(and_strategy::AndStrategy),
+                Box::new(not_strategy::NotStrategy),
+                Box::new(comparison_strategy::ComparisonStrategy),
+                Box::new(add_sub_strategy::AddSubStrategy),
+                Box::new(mul_div_strategy::MulDivStrategy),
+                Box::new(unary_strategy::UnaryStrategy),
+                Box::new(postfix_strategy::PostfixStrategy),
+                Box::new(primary_strategy::PrimaryStrategy::new()),
+            ],
             ids: RefCell::new(AutoNodeIdGenerator::default()),
         }
     }
