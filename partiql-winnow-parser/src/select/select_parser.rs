@@ -12,6 +12,7 @@ use crate::whitespace::{ws, ws0};
 use super::from_clause::FromClauseParser;
 use super::projection_clause::ProjectionClause;
 use super::where_clause::WhereClauseParser;
+use super::ClauseParser;
 
 /// Parses SELECT statements. Stateless — created once per engine, reused.
 /// Clause parsers borrow the ExprChain via self-referential lifetime.

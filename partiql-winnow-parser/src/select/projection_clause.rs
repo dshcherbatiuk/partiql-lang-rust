@@ -18,6 +18,8 @@ use crate::keyword::{ch, kw};
 use crate::parse_context::ParseContext;
 use crate::whitespace::{ws, ws0};
 
+use super::ClauseParser;
+
 pub struct ProjectionClause<'p> {
     chain: &'p ExprChain,
 }
@@ -26,8 +28,16 @@ impl<'p> ProjectionClause<'p> {
     pub fn new(chain: &'p ExprChain) -> Self {
         Self { chain }
     }
+}
 
-    pub fn parse(&self, input: &mut &str, pctx: &ParseContext) -> PResult<Projection> {
+impl<'p> ClauseParser for ProjectionClause<'p> {
+    type Output = Projection;
+
+    fn name(&self) -> &str {
+        "projection"
+    }
+
+    fn parse(&self, input: &mut &str, pctx: &ParseContext) -> PResult<Projection> {
         if (kw("VALUE"), ws).parse_next(input).is_ok() {
             let expr = self.chain.parse_expr(input, pctx)?;
             return Ok(Projection {
@@ -82,5 +92,97 @@ impl<'p> ProjectionClause<'p> {
             kind: ProjectionKind::ProjectList(items),
             setq,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::select::SelectParser;
+    use partiql_ast::ast::{ProjectItem, SetQuantifier};
+
+    // Helper: create a parser and context
+    fn setup() -> (SelectParser, ParseContext) {
+        (SelectParser::new(), ParseContext::new())
+    }
+
+    #[test]
+    fn test_star() {
+        let (parser, pctx) = setup();
+        let mut input = "* FROM";
+        let result = ProjectionClause::new(parser.chain())
+            .parse(&mut input, &pctx)
+            .expect("parse failed");
+        assert!(matches!(result.kind, ProjectionKind::ProjectStar));
+        assert!(result.setq.is_none());
+    }
+
+    #[test]
+    fn test_value_expr() {
+        let (parser, pctx) = setup();
+        let mut input = "VALUE x FROM";
+        let result = ProjectionClause::new(parser.chain())
+            .parse(&mut input, &pctx)
+            .expect("parse failed");
+        assert!(matches!(result.kind, ProjectionKind::ProjectValue(_)));
+    }
+
+    #[test]
+    fn test_single_field() {
+        let (parser, pctx) = setup();
+        let mut input = "a FROM";
+        let result = ProjectionClause::new(parser.chain())
+            .parse(&mut input, &pctx)
+            .expect("parse failed");
+        match &result.kind {
+            ProjectionKind::ProjectList(items) => assert_eq!(items.len(), 1),
+            other => panic!("expected ProjectList, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_multiple_fields() {
+        let (parser, pctx) = setup();
+        let mut input = "a, b, c FROM";
+        let result = ProjectionClause::new(parser.chain())
+            .parse(&mut input, &pctx)
+            .expect("parse failed");
+        match &result.kind {
+            ProjectionKind::ProjectList(items) => assert_eq!(items.len(), 3),
+            other => panic!("expected ProjectList, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_field_with_alias() {
+        let (parser, pctx) = setup();
+        let mut input = "a AS col1 FROM";
+        let result = ProjectionClause::new(parser.chain())
+            .parse(&mut input, &pctx)
+            .expect("parse failed");
+        match &result.kind {
+            ProjectionKind::ProjectList(items) => {
+                assert_eq!(items.len(), 1);
+                match &items[0].node {
+                    ProjectItem::ProjectExpr(pe) => {
+                        assert!(pe.as_alias.is_some());
+                        assert_eq!(pe.as_alias.as_ref().unwrap().value, "col1");
+                    }
+                    other => panic!("expected ProjectExpr, got {:?}", other),
+                }
+            }
+            other => panic!("expected ProjectList, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_distinct() {
+        let (parser, pctx) = setup();
+        let mut input = "DISTINCT a FROM";
+        let result = ProjectionClause::new(parser.chain())
+            .parse(&mut input, &pctx)
+            .expect("parse failed");
+        assert!(matches!(result.setq, Some(SetQuantifier::Distinct)));
+        assert!(matches!(result.kind, ProjectionKind::ProjectList(_)));
     }
 }

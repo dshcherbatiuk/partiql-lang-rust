@@ -5,9 +5,11 @@
 //! │ SelectParser (stateless, created once)   │
 //! │                                          │
 //! │  chain: ExprChain                        │
-//! │  projection: ProjectionClause            │
-//! │  from: FromClause                        │
-//! │  where_: WhereClause                     │
+//! │                                          │
+//! │ ClauseParser trait:                      │
+//! │  ProjectionClause                        │
+//! │  FromClauseParser                        │
+//! │  WhereClauseParser                       │
 //! │  // TODO: GroupByClause, HavingClause,   │
 //! │  //       OrderByClause, LimitOffset     │
 //! │                                          │
@@ -22,3 +24,20 @@ mod select_parser;
 pub mod where_clause;
 
 pub use select_parser::SelectParser;
+
+use winnow::prelude::*;
+
+use crate::parse_context::ParseContext;
+
+/// Each SELECT clause implements this trait.
+///
+/// `Output` is the clause-specific AST node (e.g., `Projection`, `AstNode<FromClause>`).
+/// Clause parsers are stateless — they hold `&ExprChain` for expression delegation
+/// and receive `&ParseContext` per parse call for mutable state.
+pub trait ClauseParser {
+    type Output;
+
+    fn parse(&self, input: &mut &str, pctx: &ParseContext) -> PResult<Self::Output>;
+
+    fn name(&self) -> &str;
+}
