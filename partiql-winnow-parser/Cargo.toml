@@ -1,0 +1,24 @@
+[package]
+name = "partiql-winnow-parser"
+description = "PartiQL Parser — winnow combinator implementation"
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license = "Apache-2.0"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+bench = false
+
+[dependencies]
+partiql-ast = { path = "../partiql-ast", version = "0.14.0-nxp" }
+partiql-common = { path = "../partiql-common", version = "0.14.0-nxp" }
+
+winnow = "0.6"
+
+thiserror = "2.0"
+rust_decimal = { version = "1.39", default-features = false, features = ["std"] }
+
+[dev-dependencies]
+partiql-parser = { path = "../partiql-parser", version = "0.14.0-nxp" }

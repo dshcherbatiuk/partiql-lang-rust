@@ -1,0 +1,80 @@
+//! Case-insensitive SQL keyword matching for PartiQL.
+//!
+//! PartiQL keywords are case-insensitive per the SQL standard:
+//! `SELECT`, `select`, `SeLeCt` all match the same keyword.
+//!
+//! This module provides a `kw()` combinator that matches a keyword
+//! without consuming trailing whitespace. The caller is responsible
+//! for whitespace handling — this keeps keyword matching composable
+//! with different whitespace rules (mandatory ws after FROM,
+//! optional ws before comma, etc.).
+//!
+//! ## Word boundary
+//!
+//! `kw("SELECT")` will match the prefix of `"SELECTING"`. Callers
+//! must ensure word boundaries by requiring whitespace or punctuation
+//! after the keyword. Typical usage:
+//!
+//! ```text
+//! (kw("SELECT"), ws)          // SELECT followed by mandatory whitespace
+//! (kw("FROM"), ws)            // FROM followed by mandatory whitespace
+//! (ws0, kw("WHERE"), ws)      // optional ws before, mandatory after
+//! ```
+//!
+//! ## Reserved keywords
+//!
+//! PartiQL reserves the following keywords (subset relevant to FDE):
+//!
+//! | Category | Keywords |
+//! |----------|----------|
+//! | DQL | SELECT, FROM, WHERE, GROUP, BY, HAVING, ORDER, LIMIT, OFFSET, AS, AT, JOIN, ON, CROSS, INNER, LEFT, RIGHT, FULL, OUTER, VALUE, DISTINCT, ALL |
+//! | DML | INSERT, INTO, DELETE, REPLACE, UPSERT, SET, ON, CONFLICT, DO, NOTHING, EXCLUDED, UPDATE |
+//! | Operators | AND, OR, NOT, IN, LIKE, BETWEEN, IS, NULL, MISSING, TRUE, FALSE, ASC, DESC, CASE, WHEN, THEN, ELSE, END, CAST, COALESCE, NULLIF |
+//! | Functions | COUNT, SUM, AVG, MIN, MAX, CURRENT_TIMESTAMP, CURRENT_TIME, TO_STRING |
+
+use winnow::error::ContextError;
+use winnow::prelude::*;
+
+/// Match a SQL keyword case-insensitively.
+///
+/// Does NOT consume trailing whitespace — caller controls whitespace rules.
+///
+/// # BNF
+/// ```text
+/// keyword ::= SELECT | FROM | WHERE | INSERT | INTO | DELETE | ...
+/// ```
+pub fn kw<'a>(keyword: &'static str) -> impl Parser<&'a str, &'a str, ContextError> {
+    winnow::ascii::Caseless(keyword)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_case_insensitive() {
+        let mut i = "SELECT rest";
+        assert!(kw("SELECT").parse_next(&mut i).is_ok());
+        assert_eq!(i, " rest");
+
+        let mut i = "select rest";
+        assert!(kw("SELECT").parse_next(&mut i).is_ok());
+
+        let mut i = "SeLeCt rest";
+        assert!(kw("SELECT").parse_next(&mut i).is_ok());
+    }
+
+    #[test]
+    fn test_no_match() {
+        let mut i = "INSERT rest";
+        assert!(kw("SELECT").parse_next(&mut i).is_err());
+    }
+
+    #[test]
+    fn test_partial_match_needs_boundary() {
+        // kw matches prefix — caller must check word boundary with ws
+        let mut i = "SELECTING rest";
+        assert!(kw("SELECT").parse_next(&mut i).is_ok());
+        assert_eq!(i, "ING rest");
+    }
+}

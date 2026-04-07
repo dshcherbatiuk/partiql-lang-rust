@@ -25,6 +25,7 @@ members = [
     "partiql-ir",
     "partiql-irgen",
     "partiql-parser",
+    "partiql-winnow-parser",
     "partiql-rewriter",
     "partiql-types",
     "partiql-value",
