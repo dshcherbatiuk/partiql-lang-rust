@@ -22,3 +22,40 @@ impl LiteralStrategy for NullMissingStrategy {
         "NullMissing"
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::expr::ExprChain;
+    use partiql_ast::ast;
+    use partiql_ast::ast::Lit;
+
+    fn parse(input: &str) -> ast::Expr {
+        let chain = ExprChain::new();
+        let mut i = input;
+        chain.parse_expr(&mut i).expect("parse failed")
+    }
+
+    #[test]
+    fn null_generic() {
+        let expr = parse("null");
+        assert!(matches!(expr, ast::Expr::Lit(n) if matches!(n.node, Lit::Null)));
+    }
+
+    #[test]
+    fn null_typed_int() {
+        let expr = parse("null.int");
+        assert!(matches!(expr, ast::Expr::Lit(n) if matches!(n.node, Lit::Null)));
+    }
+
+    #[test]
+    fn null_typed_string() {
+        let expr = parse("null.string");
+        assert!(matches!(expr, ast::Expr::Lit(n) if matches!(n.node, Lit::Null)));
+    }
+
+    #[test]
+    fn missing_keyword() {
+        let expr = parse("MISSING");
+        assert!(matches!(expr, ast::Expr::Lit(n) if matches!(n.node, Lit::Missing)));
+    }
+}
