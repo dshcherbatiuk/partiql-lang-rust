@@ -26,37 +26,39 @@ use winnow::token::take_while;
 /// Quoted identifier: `"some.table"` → `some.table`
 ///
 /// Allows any characters between double quotes except double quote itself.
-pub fn quoted_identifier<'a>(input: &mut &'a str) -> PResult<String> {
-    delimited('"', take_while(1.., |c: char| c != '"'), '"')
-        .map(|s: &str| s.to_string())
-        .parse_next(input)
+/// Returns a borrowed `&str` — zero allocation.
+#[inline]
+pub fn quoted_identifier<'a>(input: &mut &'a str) -> PResult<&'a str> {
+    delimited('"', take_while(1.., |c: char| c != '"'), '"').parse_next(input)
 }
 
 /// Unquoted identifier: `tableName`, `_field1`, `email`
 ///
 /// Must start with ASCII letter or underscore. Continues with alphanumeric
-/// or underscore. Does NOT match keywords — caller must check separately.
-pub fn unquoted_identifier<'a>(input: &mut &'a str) -> PResult<String> {
-    (
-        take_while(1, |c: char| c.is_ascii_alphabetic() || c == '_'),
-        take_while(0.., |c: char| c.is_ascii_alphanumeric() || c == '_'),
-    )
-        .map(|(first, rest): (&str, &str)| format!("{first}{rest}"))
-        .parse_next(input)
+/// or underscore. Returns a borrowed `&str` — zero allocation.
+#[inline]
+pub fn unquoted_identifier<'a>(input: &mut &'a str) -> PResult<&'a str> {
+    let start = *input;
+    let _ = take_while(1, |c: char| c.is_ascii_alphabetic() || c == '_').parse_next(input)?;
+    let _ = take_while(0.., |c: char| c.is_ascii_alphanumeric() || c == '_').parse_next(input)?;
+    Ok(&start[..start.len() - input.len()])
 }
 
 /// Identifier — quoted or unquoted.
 ///
 /// Tries quoted first (starts with `"`), then unquoted.
-pub fn identifier<'a>(input: &mut &'a str) -> PResult<String> {
+/// Returns a borrowed `&str` — zero allocation.
+#[inline]
+pub fn identifier<'a>(input: &mut &'a str) -> PResult<&'a str> {
     alt((quoted_identifier, unquoted_identifier)).parse_next(input)
 }
 
-/// Identifier with case sensitivity — returns (name, is_quoted).
+/// Identifier with case sensitivity — returns (&str, is_quoted).
 ///
 /// Quoted identifiers (`"fde.users"`) are case-sensitive.
 /// Unquoted identifiers (`users`) are case-insensitive.
-pub fn identifier_with_case<'a>(input: &mut &'a str) -> PResult<(String, bool)> {
+#[inline]
+pub fn identifier_with_case<'a>(input: &mut &'a str) -> PResult<(&'a str, bool)> {
     if let Ok(name) = quoted_identifier.parse_next(input) {
         Ok((name, true))
     } else {
@@ -68,17 +70,18 @@ pub fn identifier_with_case<'a>(input: &mut &'a str) -> PResult<(String, bool)> 
 /// Dotted path: `a.b.c` or `"schema"."table".column`
 ///
 /// Parses a sequence of identifiers separated by dots. Stops when no
-/// more dots follow.
+/// more dots follow. Returns a borrowed `&str` for simple paths,
+/// allocates only for quoted segments that need joining.
 pub fn dotted_path<'a>(input: &mut &'a str) -> PResult<String> {
     let first = identifier.parse_next(input)?;
-    let mut path = first;
+    let mut path = first.to_string();
     while winnow::token::one_of::<_, _, ContextError>('.')
         .parse_next(input)
         .is_ok()
     {
         let next = identifier.parse_next(input)?;
         path.push('.');
-        path.push_str(&next);
+        path.push_str(next);
     }
     Ok(path)
 }

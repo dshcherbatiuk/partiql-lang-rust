@@ -4,7 +4,7 @@
 //! insert ::= INSERT INTO expr expr
 //! ```
 
-use partiql_ast::ast::{self, Dml, DmlOp, Insert};
+use partiql_ast::ast::{self, ConflictAction, Dml, DmlOp, Insert, InsertValue, OnConflict};
 use winnow::prelude::*;
 
 use super::DmlStrategy;

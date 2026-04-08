@@ -55,7 +55,7 @@ impl<'p> ClauseParser for GroupByClauseParser<'p> {
             let as_alias = if (kw("AS"), ws).parse_next(input).is_ok() {
                 let alias = identifier::identifier(input)?;
                 Some(SymbolPrimitive {
-                    value: alias,
+                    value: alias.to_string(),
                     case: CaseSensitivity::CaseInsensitive,
                 })
             } else {
@@ -77,7 +77,7 @@ impl<'p> ClauseParser for GroupByClauseParser<'p> {
         let group_as_alias = if (kw("GROUP"), ws, kw("AS"), ws).parse_next(input).is_ok() {
             let alias = identifier::identifier(input)?;
             Some(SymbolPrimitive {
-                value: alias,
+                value: alias.to_string(),
                 case: CaseSensitivity::CaseInsensitive,
             })
         } else {

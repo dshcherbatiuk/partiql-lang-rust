@@ -67,7 +67,7 @@ pub(crate) fn parse_source(
     let as_alias = if (kw("AS"), ws).parse_next(input).is_ok() {
         let alias = identifier::identifier(input)?;
         Some(SymbolPrimitive {
-            value: alias,
+            value: alias.to_string(),
             case: CaseSensitivity::CaseInsensitive,
         })
     } else {
@@ -78,7 +78,7 @@ pub(crate) fn parse_source(
     let at_alias = if (kw("AT"), ws).parse_next(input).is_ok() {
         let alias = identifier::identifier(input)?;
         Some(SymbolPrimitive {
-            value: alias,
+            value: alias.to_string(),
             case: CaseSensitivity::CaseInsensitive,
         })
     } else {
@@ -111,7 +111,7 @@ fn try_implicit_alias(input: &mut &str) -> Option<SymbolPrimitive> {
             None
         } else {
             Some(SymbolPrimitive {
-                value: name,
+                value: name.to_string(),
                 case: CaseSensitivity::CaseInsensitive,
             })
         }

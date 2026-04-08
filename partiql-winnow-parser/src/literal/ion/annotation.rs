@@ -74,7 +74,7 @@ fn annotation_symbol(input: &mut &str) -> PResult<Annotation> {
     if input.starts_with('\'') {
         return quoted_symbol(input).map(Annotation::QuotedSymbol);
     }
-    unquoted_identifier(input).map(Annotation::Identifier)
+    unquoted_identifier(input).map(|s| Annotation::Identifier(s.to_string()))
 }
 
 /// Parse zero or more annotations: `a::b::` prefix before a value.

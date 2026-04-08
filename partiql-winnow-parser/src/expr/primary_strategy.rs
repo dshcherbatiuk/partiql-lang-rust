@@ -126,7 +126,7 @@ fn parse_identifier_or_call<'a>(
         if ch(')').parse_next(input).is_ok() {
             return Ok(ast::Expr::Call(ctx.node(Call {
                 func_name: SymbolPrimitive {
-                    value: name,
+                    value: name.to_string(),
                     case: CaseSensitivity::CaseInsensitive,
                 },
                 args,
@@ -140,7 +140,7 @@ fn parse_identifier_or_call<'a>(
             ch(')').parse_next(input)?;
             return Ok(ast::Expr::Call(ctx.node(Call {
                 func_name: SymbolPrimitive {
-                    value: name,
+                    value: name.to_string(),
                     case: CaseSensitivity::CaseInsensitive,
                 },
                 args,
@@ -162,7 +162,7 @@ fn parse_identifier_or_call<'a>(
 
         return Ok(ast::Expr::Call(ctx.node(Call {
             func_name: SymbolPrimitive {
-                value: name,
+                value: name.to_string(),
                 case: CaseSensitivity::CaseInsensitive,
             },
             args,
@@ -170,7 +170,7 @@ fn parse_identifier_or_call<'a>(
     }
 
     Ok(ast::Expr::VarRef(ctx.node(VarRef {
-        name: SymbolPrimitive { value: name, case },
+        name: SymbolPrimitive { value: name.to_string(), case },
         qualifier: ScopeQualifier::Unqualified,
     })))
 }

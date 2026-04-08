@@ -24,7 +24,7 @@ impl ExprStrategy for PostfixStrategy {
             if ch('.').parse_next(input).is_ok() {
                 let field = identifier::identifier(input)?;
                 steps.push(PathStep::PathProject(PathExpr {
-                    index: Box::new(ast::Expr::Lit(ctx.node(Lit::CharStringLit(field)))),
+                    index: Box::new(ast::Expr::Lit(ctx.node(Lit::CharStringLit(field.to_string())))),
                 }));
             } else if ch('[').parse_next(input).is_ok() {
                 let _ = ws0(input);

@@ -70,7 +70,7 @@ impl<'p> ClauseParser for ProjectionClause<'p> {
             let as_alias = if (kw("AS"), ws).parse_next(input).is_ok() {
                 let alias = identifier::identifier(input)?;
                 Some(SymbolPrimitive {
-                    value: alias,
+                    value: alias.to_string(),
                     case: CaseSensitivity::CaseInsensitive,
                 })
             } else {
