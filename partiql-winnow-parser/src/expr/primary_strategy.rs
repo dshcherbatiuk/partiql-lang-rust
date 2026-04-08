@@ -103,11 +103,17 @@ fn parse_paren_expr<'a>(input: &mut &'a str, ctx: &StrategyContext<'_>) -> PResu
 }
 
 /// Parse identifier — if followed by `(`, parse as function call.
+/// Double-quoted identifiers produce `CaseSensitive` VarRef.
 fn parse_identifier_or_call<'a>(
     input: &mut &'a str,
     ctx: &StrategyContext<'_>,
 ) -> PResult<ast::Expr> {
-    let name = identifier::identifier(input)?;
+    let (name, is_quoted) = identifier::identifier_with_case(input)?;
+    let case = if is_quoted {
+        CaseSensitivity::CaseSensitive
+    } else {
+        CaseSensitivity::CaseInsensitive
+    };
     let _ = ws0(input);
 
     // Function call: name(args...)
@@ -164,10 +170,7 @@ fn parse_identifier_or_call<'a>(
     }
 
     Ok(ast::Expr::VarRef(ctx.node(VarRef {
-        name: SymbolPrimitive {
-            value: name,
-            case: CaseSensitivity::CaseInsensitive,
-        },
+        name: SymbolPrimitive { value: name, case },
         qualifier: ScopeQualifier::Unqualified,
     })))
 }
@@ -204,10 +207,12 @@ mod tests {
     }
 
     #[test]
-    fn test_ion_string() {
+    fn test_quoted_identifier() {
+        // Double-quoted strings are case-sensitive identifiers, not string literals
         assert!(matches!(
             &parse(r#""hello""#),
-            ast::Expr::Lit(n) if matches!(&n.node, Lit::CharStringLit(s) if s == "hello")
+            ast::Expr::VarRef(n) if n.node.name.value == "hello"
+                && n.node.name.case == ast::CaseSensitivity::CaseSensitive
         ));
     }
 

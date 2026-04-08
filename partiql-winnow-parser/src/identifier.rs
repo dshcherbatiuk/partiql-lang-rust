@@ -52,6 +52,19 @@ pub fn identifier<'a>(input: &mut &'a str) -> PResult<String> {
     alt((quoted_identifier, unquoted_identifier)).parse_next(input)
 }
 
+/// Identifier with case sensitivity — returns (name, is_quoted).
+///
+/// Quoted identifiers (`"fde.users"`) are case-sensitive.
+/// Unquoted identifiers (`users`) are case-insensitive.
+pub fn identifier_with_case<'a>(input: &mut &'a str) -> PResult<(String, bool)> {
+    if let Ok(name) = quoted_identifier.parse_next(input) {
+        Ok((name, true))
+    } else {
+        let name = unquoted_identifier.parse_next(input)?;
+        Ok((name, false))
+    }
+}
+
 /// Dotted path: `a.b.c` or `"schema"."table".column`
 ///
 /// Parses a sequence of identifiers separated by dots. Stops when no

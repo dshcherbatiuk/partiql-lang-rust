@@ -259,8 +259,7 @@ mod tests {
 
     #[test]
     fn test_quoted_table() {
-        // Double-quoted identifiers are parsed as Ion string literals by the
-        // expression chain (StringLiteralStrategy takes priority over IdentifierStrategy).
+        // Double-quoted identifiers are case-sensitive VarRef in PartiQL
         let (parser, pctx) = setup();
         let mut input = "\"fde.users\"";
         let result = FromClauseParser::new(parser.chain())
@@ -268,7 +267,16 @@ mod tests {
             .expect("parse failed");
         match &result.node.source {
             FromSource::FromLet(from_let) => {
-                assert!(matches!(*from_let.node.expr, Expr::Lit(_)));
+                match &*from_let.node.expr {
+                    Expr::VarRef(v) => {
+                        assert_eq!(v.node.name.value, "fde.users");
+                        assert_eq!(
+                            v.node.name.case,
+                            partiql_ast::ast::CaseSensitivity::CaseSensitive
+                        );
+                    }
+                    other => panic!("expected VarRef, got {:?}", other),
+                }
             }
             other => panic!("expected FromLet, got {:?}", other),
         }
