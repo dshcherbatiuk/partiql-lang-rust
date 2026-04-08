@@ -462,4 +462,85 @@ mod tests {
         assert!(lo.node.limit.is_some());
         assert!(lo.node.offset.is_some());
     }
+
+    #[test]
+    fn test_select_unnest_fde_query() {
+        // Real FDE production query with UNNEST via comma-join
+        let expr = parse(
+            "SELECT p.id, p.email, u.givenName FROM \"fde.users\" u, u.platformData p \
+             WHERE p.id = '5e021ce0' AND p.platform = 'MsTeams'",
+        );
+        let (_, select) = extract_query_select(&expr);
+
+        // Projection: 3 items
+        match &select.project.node.kind {
+            ProjectionKind::ProjectList(items) => assert_eq!(items.len(), 3),
+            other => panic!("expected ProjectList, got {:?}", other),
+        }
+
+        // FROM: CROSS JOIN (comma-join)
+        let from = select.from.as_ref().expect("missing FROM");
+        match &from.node.source {
+            ast::FromSource::Join(join) => {
+                assert_eq!(join.node.kind, ast::JoinKind::Cross);
+                // Left: "fde.users" u
+                match &*join.node.left {
+                    ast::FromSource::FromLet(fl) => {
+                        assert_eq!(fl.node.as_alias.as_ref().unwrap().value, "u");
+                    }
+                    other => panic!("expected FromLet left, got {:?}", other),
+                }
+                // Right: u.platformData p (path with implicit alias)
+                match &*join.node.right {
+                    ast::FromSource::FromLet(fl) => {
+                        assert_eq!(fl.node.as_alias.as_ref().unwrap().value, "p");
+                        assert!(matches!(&*fl.node.expr, ast::Expr::Path(_)));
+                    }
+                    other => panic!("expected FromLet right, got {:?}", other),
+                }
+            }
+            other => panic!("expected Join for comma-separated FROM, got {:?}", other),
+        }
+
+        // WHERE: AND with 2 equalities
+        let where_clause = select.where_clause.as_ref().expect("missing WHERE");
+        match &*where_clause.node.expr {
+            ast::Expr::BinOp(n) => assert_eq!(n.node.kind, BinOpKind::And),
+            other => panic!("expected BinOp(And), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_select_inner_join_on() {
+        let expr = parse(
+            "SELECT u.name, o.total FROM users u JOIN orders o ON u.id = o.user_id",
+        );
+        let (_, select) = extract_query_select(&expr);
+
+        let from = select.from.as_ref().expect("missing FROM");
+        match &from.node.source {
+            ast::FromSource::Join(join) => {
+                assert_eq!(join.node.kind, ast::JoinKind::Inner);
+                assert!(join.node.predicate.is_some());
+            }
+            other => panic!("expected Join, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_select_left_join() {
+        let expr = parse(
+            "SELECT u.name, o.total FROM users u LEFT JOIN orders o ON u.id = o.user_id WHERE u.active = true",
+        );
+        let (_, select) = extract_query_select(&expr);
+
+        let from = select.from.as_ref().expect("missing FROM");
+        match &from.node.source {
+            ast::FromSource::Join(join) => {
+                assert_eq!(join.node.kind, ast::JoinKind::Left);
+            }
+            other => panic!("expected Join, got {:?}", other),
+        }
+        assert!(select.where_clause.is_some());
+    }
 }

@@ -22,6 +22,7 @@
 
 pub mod from_clause;
 pub mod group_by_clause;
+pub mod join;
 pub mod having_clause;
 pub mod limit_offset_clause;
 pub mod order_by_clause;

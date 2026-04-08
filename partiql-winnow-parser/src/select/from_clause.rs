@@ -1,67 +1,97 @@
 //! FromClause — FROM source parsing.
 //!
 //! ```text
-//! from_clause ::= from_source (',' from_source)*
-//! from_source ::= expr [AS alias] [AT alias]
+//! from_clause  ::= from_source (',' from_source)*
+//!               | from_source join_clause+
+//! from_source  ::= expr [AS alias] [AT alias]
+//! join_clause  ::= [INNER | LEFT | RIGHT | FULL | CROSS] JOIN from_source [ON expr]
 //! ```
-//! TODO: JOIN, UNNEST
+//!
+//! Comma-separated sources are folded into left-associative CROSS JOINs,
+//! matching the PartiQL spec and the existing LALRPOP parser behavior.
+//! UNNEST patterns like `FROM users u, u.platformData p` naturally produce
+//! a CROSS JOIN where the right side is a Path expression.
 
 use partiql_ast::ast::{
-    AstNode, CaseSensitivity, FromClause, FromLet, FromLetKind, FromSource, SymbolPrimitive,
+    AstNode, CaseSensitivity, FromClause, FromLet, FromLetKind, FromSource, Join, JoinKind,
+    JoinSpec, SymbolPrimitive,
 };
 use winnow::prelude::*;
 
 use crate::expr::ExprChain;
 use crate::identifier;
-use crate::keyword::kw;
+use crate::keyword::{ch, kw};
 use crate::parse_context::ParseContext;
 use crate::whitespace::{ws, ws0};
 
+use super::join::comma_join::CommaJoinParser;
+use super::join::cross_join::CrossJoinParser;
+use super::join::full_join::FullJoinParser;
+use super::join::inner_join::InnerJoinParser;
+use super::join::left_join::LeftJoinParser;
+use super::join::right_join::RightJoinParser;
+use super::join::JoinParser;
 use super::ClauseParser;
 
 pub struct FromClauseParser<'p> {
     chain: &'p ExprChain,
+    join_parsers: Vec<Box<dyn JoinParser + 'p>>,
 }
 
 impl<'p> FromClauseParser<'p> {
     pub fn new(chain: &'p ExprChain) -> Self {
-        Self { chain }
+        Self {
+            chain,
+            join_parsers: vec![
+                Box::new(CommaJoinParser::new(chain)),
+                Box::new(CrossJoinParser::new(chain)),
+                Box::new(InnerJoinParser::new(chain)),
+                Box::new(LeftJoinParser::new(chain)),
+                Box::new(RightJoinParser::new(chain)),
+                Box::new(FullJoinParser::new(chain)),
+            ],
+        }
     }
+}
 
-    fn parse_source(&self, input: &mut &str, pctx: &ParseContext) -> PResult<FromSource> {
-        let expr = self.chain.parse_expr(input, pctx)?;
-        let _ = ws0(input);
+/// Parse a single FROM source: `expr [AS alias] [AT alias]`.
+/// Shared by `FromClauseParser` and all `JoinParser` implementations.
+pub(crate) fn parse_source(
+    input: &mut &str,
+    chain: &ExprChain,
+    pctx: &ParseContext,
+) -> PResult<FromSource> {
+    let expr = chain.parse_expr(input, pctx)?;
+    let _ = ws0(input);
 
-        // AS alias — explicit or implicit (AS keyword is optional per PartiQL spec)
-        let as_alias = if (kw("AS"), ws).parse_next(input).is_ok() {
-            let alias = identifier::identifier(input)?;
-            Some(SymbolPrimitive {
-                value: alias,
-                case: CaseSensitivity::CaseInsensitive,
-            })
-        } else {
-            try_implicit_alias(input)
-        };
+    let as_alias = if (kw("AS"), ws).parse_next(input).is_ok() {
+        let alias = identifier::identifier(input)?;
+        Some(SymbolPrimitive {
+            value: alias,
+            case: CaseSensitivity::CaseInsensitive,
+        })
+    } else {
+        try_implicit_alias(input)
+    };
 
-        let _ = ws0(input);
-        let at_alias = if (kw("AT"), ws).parse_next(input).is_ok() {
-            let alias = identifier::identifier(input)?;
-            Some(SymbolPrimitive {
-                value: alias,
-                case: CaseSensitivity::CaseInsensitive,
-            })
-        } else {
-            None
-        };
+    let _ = ws0(input);
+    let at_alias = if (kw("AT"), ws).parse_next(input).is_ok() {
+        let alias = identifier::identifier(input)?;
+        Some(SymbolPrimitive {
+            value: alias,
+            case: CaseSensitivity::CaseInsensitive,
+        })
+    } else {
+        None
+    };
 
-        Ok(FromSource::FromLet(pctx.node(FromLet {
-            expr: Box::new(expr),
-            kind: FromLetKind::Scan,
-            as_alias,
-            at_alias,
-            by_alias: None,
-        })))
-    }
+    Ok(FromSource::FromLet(pctx.node(FromLet {
+        expr: Box::new(expr),
+        kind: FromLetKind::Scan,
+        as_alias,
+        at_alias,
+        by_alias: None,
+    })))
 }
 
 /// Reserved keywords that cannot be implicit aliases.
@@ -90,6 +120,29 @@ fn try_implicit_alias(input: &mut &str) -> Option<SymbolPrimitive> {
     }
 }
 
+impl<'p> FromClauseParser<'p> {
+    /// Chain of Responsibility — tries each join parser in order.
+    /// Returns `Some(joined)` if a parser matched, `None` if none matched.
+    fn try_join(
+        &self,
+        input: &mut &str,
+        pctx: &ParseContext,
+        left: FromSource,
+    ) -> Result<Option<FromSource>, winnow::error::ErrMode<winnow::error::ContextError>> {
+        for parser in &self.join_parsers {
+            let checkpoint = *input;
+            match parser.parse(input, pctx, left.clone()) {
+                Ok(joined) => return Ok(Some(joined)),
+                Err(winnow::error::ErrMode::Backtrack(_)) => {
+                    *input = checkpoint;
+                }
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(None)
+    }
+}
+
 impl<'p> ClauseParser for FromClauseParser<'p> {
     type Output = AstNode<FromClause>;
 
@@ -98,8 +151,16 @@ impl<'p> ClauseParser for FromClauseParser<'p> {
     }
 
     fn parse(&self, input: &mut &str, pctx: &ParseContext) -> PResult<AstNode<FromClause>> {
-        let source = self.parse_source(input, pctx)?;
-        // TODO: comma-separated sources, JOINs
+        let mut source = parse_source(input, self.chain, pctx)?;
+
+        loop {
+            let _ = ws0(input);
+            match self.try_join(input, pctx, source.clone())? {
+                Some(joined) => source = joined,
+                None => break,
+            }
+        }
+
         Ok(pctx.node(FromClause { source }))
     }
 }
