@@ -67,7 +67,7 @@ pub(crate) fn parse_partiql_value_str(contents: &str) -> Value {
         .parse(contents)
         .expect("Expect successful parse");
     let planner = partiql_logical_planner::LogicalPlanner::new(&catalog);
-    let logical = planner.lower(&parsed).expect("logical plan");
+    let logical = planner.lower(&parsed.ast).expect("logical plan");
     let evaluator = EvaluatorPlanner::new(EvaluationMode::Permissive, &catalog)
         .compile(&logical)
         .expect("Expect no plan error");

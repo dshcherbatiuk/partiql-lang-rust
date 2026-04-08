@@ -133,7 +133,7 @@ mod tests {
 
         let parsed = parser.parse("SELECT COUNT(u) FROM t u").unwrap();
         let planner = LogicalPlanner::new(&shared_catalog);
-        let logical = planner.lower(&parsed).unwrap();
+        let logical = planner.lower(&parsed.ast).unwrap();
         let mut eval_planner =
             crate::plan::EvaluatorPlanner::new(EvaluationMode::Permissive, &shared_catalog);
         let eval_plan = eval_planner.compile(&logical).unwrap();
@@ -195,7 +195,7 @@ mod tests {
             .parse("SELECT COUNT(u) FROM t u WHERE u.status = 'active'")
             .unwrap();
         let planner = LogicalPlanner::new(&shared_catalog);
-        let logical = planner.lower(&parsed).unwrap();
+        let logical = planner.lower(&parsed.ast).unwrap();
         let mut eval_planner =
             crate::plan::EvaluatorPlanner::new(EvaluationMode::Permissive, &shared_catalog);
         let eval_plan = eval_planner.compile(&logical).unwrap();
@@ -255,7 +255,7 @@ mod tests {
             .parse("SELECT VALUE count(1) FROM events e WHERE e.type = 'NonExistent'")
             .unwrap();
         let planner = LogicalPlanner::new(&shared_catalog);
-        let logical = planner.lower(&parsed).unwrap();
+        let logical = planner.lower(&parsed.ast).unwrap();
         let mut eval_planner =
             crate::plan::EvaluatorPlanner::new(EvaluationMode::Permissive, &shared_catalog);
         let eval_plan = eval_planner.compile(&logical).unwrap();
@@ -314,7 +314,7 @@ mod tests {
 
         let parsed = parser.parse("SELECT VALUE COUNT(1) FROM events").unwrap();
         let planner = LogicalPlanner::new(&shared_catalog);
-        let logical = planner.lower(&parsed).unwrap();
+        let logical = planner.lower(&parsed.ast).unwrap();
         let mut eval_planner =
             crate::plan::EvaluatorPlanner::new(EvaluationMode::Permissive, &shared_catalog);
         let eval_plan = eval_planner.compile(&logical).unwrap();

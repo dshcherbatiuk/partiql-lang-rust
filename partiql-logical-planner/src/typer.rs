@@ -948,6 +948,6 @@ mod tests {
         catalog: &dyn SharedCatalog,
     ) -> Result<logical::LogicalPlan<logical::BindingsOp>, AstTransformationError> {
         let planner = LogicalPlanner::new(catalog);
-        planner.lower(parsed)
+        planner.lower(&parsed.ast)
     }
 }

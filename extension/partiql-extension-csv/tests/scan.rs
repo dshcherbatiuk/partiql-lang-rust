@@ -23,7 +23,7 @@ pub(crate) fn lower(
     parsed: &Parsed<'_>,
 ) -> partiql_logical::LogicalPlan<partiql_logical::BindingsOp> {
     let planner = partiql_logical_planner::LogicalPlanner::new(catalog);
-    planner.lower(parsed).expect("lower")
+    planner.lower(&parsed.ast).expect("lower")
 }
 
 #[track_caller]

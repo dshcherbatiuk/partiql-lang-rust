@@ -2082,7 +2082,7 @@ mod tests {
             .parse(statement)
             .expect("Expect successful parse");
         let planner = LogicalPlanner::new(&catalog);
-        let logical = planner.lower(&parsed);
+        let logical = planner.lower(&parsed.ast);
         assert!(logical.is_err());
         let lowering_errs = logical.expect_err("Expect errs").errors;
         assert_eq!(lowering_errs.len(), 2);
@@ -2104,7 +2104,7 @@ mod tests {
             .parse(statement)
             .expect("Expect successful parse");
         let planner = LogicalPlanner::new(&catalog);
-        let logical = planner.lower(&parsed);
+        let logical = planner.lower(&parsed.ast);
         assert!(logical.is_err());
         let lowering_errs = logical.expect_err("Expect errs").errors;
         assert_eq!(lowering_errs.len(), 2);
@@ -2176,7 +2176,7 @@ mod tests {
             .parse(statement)
             .expect("Expect successful parse");
         let planner = LogicalPlanner::new(&catalog);
-        let logical = planner.lower(&parsed).expect("Expect successful lowering");
+        let logical = planner.lower(&parsed.ast).expect("Expect successful lowering");
         assert_eq!(expected_logical, logical);
 
         println!("logical: {:?}", &logical);

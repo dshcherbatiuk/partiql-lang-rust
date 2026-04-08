@@ -64,7 +64,7 @@ pub(crate) fn lower(
     parsed: &Parsed<'_>,
 ) -> Result<logical::LogicalPlan<logical::BindingsOp>, AstTransformationError> {
     let planner = partiql_logical_planner::LogicalPlanner::new(catalog);
-    planner.lower(parsed)
+    planner.lower(&parsed.ast)
 }
 
 #[track_caller]

@@ -3,10 +3,10 @@
 
 use crate::lower::AstToLogical;
 
+use partiql_ast::ast;
 use partiql_ast_passes::error::AstTransformationError;
 use partiql_ast_passes::name_resolver::NameResolver;
 use partiql_logical as logical;
-use partiql_parser::Parsed;
 
 use partiql_catalog::catalog::SharedCatalog;
 
@@ -29,12 +29,11 @@ impl<'c> LogicalPlanner<'c> {
     #[inline]
     pub fn lower(
         &self,
-        parsed: &Parsed<'_>,
+        ast: &ast::AstNode<ast::TopLevelQuery>,
     ) -> Result<logical::LogicalPlan<logical::BindingsOp>, AstTransformationError> {
-        let q = &parsed.ast;
         let mut resolver = NameResolver::new(self.catalog);
-        let registry = resolver.resolve(q)?;
+        let registry = resolver.resolve(ast)?;
         let planner = AstToLogical::new(self.catalog, registry);
-        planner.lower_query(q)
+        planner.lower_query(ast)
     }
 }

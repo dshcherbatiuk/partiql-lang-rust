@@ -25,7 +25,6 @@ partiql-ast = { path = "../partiql-ast", version = "0.14.0-nxp" }
 partiql-ast-passes = { path = "../partiql-ast-passes", version = "0.14.0-nxp" }
 partiql-catalog = { path = "../partiql-catalog", version = "0.14.0-nxp" }
 partiql-common = { path = "../partiql-common", version = "0.14.0-nxp" }
-partiql-parser = { path = "../partiql-parser", version = "0.14.0-nxp" }
 partiql-logical = { path = "../partiql-logical", version = "0.14.0-nxp" }
 partiql-types = { path = "../partiql-types", version = "0.14.0-nxp" }
 partiql-value = { path = "../partiql-value", version = "0.14.0-nxp" }
@@ -44,4 +43,5 @@ rustc-hash = "2.1.2"
 
 [dev-dependencies]
 #partiql-eval = { path = "../partiql-eval", version = "0.12.*" }
+partiql-parser = { path = "../partiql-parser", version = "0.14.0-nxp" }
 partiql-types = { path = "../partiql-types", version = "0.14.0-nxp" }
