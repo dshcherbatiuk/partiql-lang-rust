@@ -29,7 +29,7 @@ impl<'p> JoinParser for FullJoinParser<'p> {
         &self,
         input: &mut &str,
         pctx: &ParseContext,
-        left: FromSource,
+        left: &FromSource,
     ) -> PResult<FromSource> {
         (kw("FULL"), ws).parse_next(input)?;
         let _ = (kw("OUTER"), ws).parse_next(input);
@@ -47,7 +47,7 @@ impl<'p> JoinParser for FullJoinParser<'p> {
 
         Ok(FromSource::Join(pctx.node(Join {
             kind: JoinKind::Full,
-            left: Box::new(left),
+            left: Box::new(left.clone()),
             right: Box::new(right),
             predicate,
         })))

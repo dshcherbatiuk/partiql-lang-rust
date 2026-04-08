@@ -29,7 +29,7 @@ impl<'p> JoinParser for LeftJoinParser<'p> {
         &self,
         input: &mut &str,
         pctx: &ParseContext,
-        left: FromSource,
+        left: &FromSource,
     ) -> PResult<FromSource> {
         (kw("LEFT"), ws).parse_next(input)?;
         let _ = (kw("OUTER"), ws).parse_next(input); // optional OUTER
@@ -47,7 +47,7 @@ impl<'p> JoinParser for LeftJoinParser<'p> {
 
         Ok(FromSource::Join(pctx.node(Join {
             kind: JoinKind::Left,
-            left: Box::new(left),
+            left: Box::new(left.clone()),
             right: Box::new(right),
             predicate,
         })))

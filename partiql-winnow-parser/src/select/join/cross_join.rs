@@ -29,14 +29,14 @@ impl<'p> JoinParser for CrossJoinParser<'p> {
         &self,
         input: &mut &str,
         pctx: &ParseContext,
-        left: FromSource,
+        left: &FromSource,
     ) -> PResult<FromSource> {
         (kw("CROSS"), ws, kw("JOIN"), ws).parse_next(input)?;
         let right = parse_source(input, self.chain, pctx)?;
 
         Ok(FromSource::Join(pctx.node(Join {
             kind: JoinKind::Cross,
-            left: Box::new(left),
+            left: Box::new(left.clone()),
             right: Box::new(right),
             predicate: None,
         })))

@@ -127,11 +127,11 @@ impl<'p> FromClauseParser<'p> {
         &self,
         input: &mut &str,
         pctx: &ParseContext,
-        left: FromSource,
+        left: &FromSource,
     ) -> Result<Option<FromSource>, winnow::error::ErrMode<winnow::error::ContextError>> {
         for parser in &self.join_parsers {
             let checkpoint = *input;
-            match parser.parse(input, pctx, left.clone()) {
+            match parser.parse(input, pctx, left) {
                 Ok(joined) => return Ok(Some(joined)),
                 Err(winnow::error::ErrMode::Backtrack(_)) => {
                     *input = checkpoint;
@@ -155,7 +155,7 @@ impl<'p> ClauseParser for FromClauseParser<'p> {
 
         loop {
             let _ = ws0(input);
-            match self.try_join(input, pctx, source.clone())? {
+            match self.try_join(input, pctx, &source)? {
                 Some(joined) => source = joined,
                 None => break,
             }

@@ -67,24 +67,68 @@ impl ExprStrategy for PrimaryStrategy {
     fn parse<'a>(&self, input: &mut &'a str, ctx: &StrategyContext<'_>) -> PResult<ast::Expr> {
         let _ = ws0(input);
 
-        // Try each literal strategy
-        for strategy in &self.literal_strategies {
-            let checkpoint = *input;
-            match strategy.parse(input, ctx) {
-                Ok(expr) => return Ok(expr),
-                Err(winnow::error::ErrMode::Backtrack(_)) => {
+        // First-char dispatch — avoids iterating 8 strategies for common cases
+        match input.as_bytes().first() {
+            Some(b'\'') => {
+                return self.literal_strategies[4].parse(input, ctx); // StringLiteralStrategy
+            }
+            Some(b'0'..=b'9') => {
+                return self.literal_strategies[5].parse(input, ctx); // NumericLiteralStrategy
+            }
+            Some(b'[') => {
+                return self.literal_strategies[1].parse(input, ctx); // ListConstructorStrategy
+            }
+            Some(b'{') => {
+                return self.literal_strategies[2].parse(input, ctx); // StructConstructorStrategy
+            }
+            Some(b'(') => {
+                return parse_paren_expr(input, ctx);
+            }
+            Some(b'<') => {
+                // << bag >> or fall through
+                let checkpoint = *input;
+                if let Ok(expr) = self.literal_strategies[0].parse(input, ctx) {
+                    return Ok(expr); // BagConstructorStrategy
+                }
+                *input = checkpoint;
+            }
+            Some(b'"') => {
+                // Double-quoted = case-sensitive identifier
+                return parse_identifier_or_call(input, ctx);
+            }
+            _ => {}
+        }
+
+        // Keywords: CASE, NULL, MISSING, TRUE, FALSE — or identifier/function call
+        // Peek at keyword without consuming
+        if let Some(b'a'..=b'z' | b'A'..=b'Z' | b'_') = input.as_bytes().first() {
+            // Try CASE first (starts with 'C'/'c')
+            if input.len() >= 4 {
+                let prefix = &input[..4];
+                if prefix.eq_ignore_ascii_case("CASE")
+                    && input.as_bytes().get(4).map_or(true, |b| !b.is_ascii_alphanumeric() && *b != b'_')
+                {
+                    let checkpoint = *input;
+                    if let Ok(expr) = self.literal_strategies[3].parse(input, ctx) {
+                        return Ok(expr); // CaseExprStrategy
+                    }
                     *input = checkpoint;
                 }
-                Err(e) => return Err(e),
             }
+
+            // Try null/missing/true/false via keyword check (no allocation)
+            let checkpoint = *input;
+            if let Ok(expr) = self.literal_strategies[6].parse(input, ctx) {
+                return Ok(expr); // NullMissingStrategy
+            }
+            *input = checkpoint;
+            if let Ok(expr) = self.literal_strategies[7].parse(input, ctx) {
+                return Ok(expr); // BooleanLiteralStrategy
+            }
+            *input = checkpoint;
         }
 
-        // Parenthesized expression: ( expr )
-        if let Ok(expr) = parse_paren_expr(input, ctx) {
-            return Ok(expr);
-        }
-
-        // Function call or identifier (last — catches anything that looks like a name)
+        // Function call or identifier (catches anything that looks like a name)
         parse_identifier_or_call(input, ctx)
     }
 

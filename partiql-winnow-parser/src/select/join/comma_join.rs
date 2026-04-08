@@ -29,7 +29,7 @@ impl<'p> JoinParser for CommaJoinParser<'p> {
         &self,
         input: &mut &str,
         pctx: &ParseContext,
-        left: FromSource,
+        left: &FromSource,
     ) -> PResult<FromSource> {
         ch(',').parse_next(input)?;
         let _ = ws0(input);
@@ -37,7 +37,7 @@ impl<'p> JoinParser for CommaJoinParser<'p> {
 
         Ok(FromSource::Join(pctx.node(Join {
             kind: JoinKind::Cross,
-            left: Box::new(left),
+            left: Box::new(left.clone()),
             right: Box::new(right),
             predicate: None,
         })))

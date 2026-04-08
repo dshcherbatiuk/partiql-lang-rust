@@ -29,7 +29,7 @@ impl<'p> JoinParser for InnerJoinParser<'p> {
         &self,
         input: &mut &str,
         pctx: &ParseContext,
-        left: FromSource,
+        left: &FromSource,
     ) -> PResult<FromSource> {
         // Optional INNER keyword
         let _ = (kw("INNER"), ws).parse_next(input);
@@ -47,7 +47,7 @@ impl<'p> JoinParser for InnerJoinParser<'p> {
 
         Ok(FromSource::Join(pctx.node(Join {
             kind: JoinKind::Inner,
-            left: Box::new(left),
+            left: Box::new(left.clone()),
             right: Box::new(right),
             predicate,
         })))

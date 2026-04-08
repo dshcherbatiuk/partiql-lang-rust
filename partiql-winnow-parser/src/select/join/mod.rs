@@ -26,7 +26,7 @@ pub trait JoinParser {
         &self,
         input: &mut &str,
         pctx: &ParseContext,
-        left: FromSource,
+        left: &FromSource,
     ) -> PResult<FromSource>;
 
     fn name(&self) -> &str;
