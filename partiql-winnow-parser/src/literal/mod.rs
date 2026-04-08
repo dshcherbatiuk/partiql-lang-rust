@@ -40,11 +40,14 @@
 //! offset    ::= 'Z' | ('+' | '-') HH ':' MM
 //! ```
 
+pub mod bag_strategy;
 pub mod boolean_strategy;
 pub mod ion;
+pub mod list_strategy;
 pub mod null_strategy;
 pub mod number_strategy;
 pub mod string_strategy;
+pub mod struct_strategy;
 
 use crate::expr::StrategyContext;
 use partiql_ast::ast;

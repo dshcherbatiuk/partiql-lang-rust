@@ -89,14 +89,15 @@ impl ExprStrategy for ComparisonStrategy {
         }
 
         // Comparison operators: = != <> < > <= >=
+        // Note: `<` must not match `<<` (bag open), `>` must not match `>>` (bag close)
         if let Ok(kind) = alt((
             lit("!=").map(|_| BinOpKind::Ne),
             lit("<>").map(|_| BinOpKind::Ne),
             lit("<=").map(|_| BinOpKind::Lte),
             lit(">=").map(|_| BinOpKind::Gte),
             lit("=").map(|_| BinOpKind::Eq),
-            lit("<").map(|_| BinOpKind::Lt),
-            lit(">").map(|_| BinOpKind::Gt),
+            parse_single_lt.map(|_| BinOpKind::Lt),
+            parse_single_gt.map(|_| BinOpKind::Gt),
         ))
         .parse_next(input)
         {
@@ -115,6 +116,40 @@ impl ExprStrategy for ComparisonStrategy {
     fn name(&self) -> &str {
         "Comparison"
     }
+}
+
+/// Match `<` but NOT `<<` (bag open) or `<=` or `<>`.
+fn parse_single_lt<'a>(
+    input: &mut &'a str,
+) -> PResult<&'a str> {
+    let checkpoint = *input;
+    let matched = lit("<").parse_next(input)?;
+    if let Some(next) = input.chars().next() {
+        if next == '<' || next == '=' || next == '>' {
+            *input = checkpoint;
+            return Err(winnow::error::ErrMode::Backtrack(
+                winnow::error::ContextError::new(),
+            ));
+        }
+    }
+    Ok(matched)
+}
+
+/// Match `>` but NOT `>>` (bag close) or `>=`.
+fn parse_single_gt<'a>(
+    input: &mut &'a str,
+) -> PResult<&'a str> {
+    let checkpoint = *input;
+    let matched = lit(">").parse_next(input)?;
+    if let Some(next) = input.chars().next() {
+        if next == '>' || next == '=' {
+            *input = checkpoint;
+            return Err(winnow::error::ErrMode::Backtrack(
+                winnow::error::ContextError::new(),
+            ));
+        }
+    }
+    Ok(matched)
 }
 
 #[cfg(test)]

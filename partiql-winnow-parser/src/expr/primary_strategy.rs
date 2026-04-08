@@ -25,10 +25,13 @@ use winnow::prelude::*;
 use super::{ExprStrategy, StrategyContext};
 use crate::identifier;
 use crate::keyword::ch;
+use crate::literal::bag_strategy::BagConstructorStrategy;
 use crate::literal::boolean_strategy::BooleanLiteralStrategy;
+use crate::literal::list_strategy::ListConstructorStrategy;
 use crate::literal::null_strategy::NullMissingStrategy;
 use crate::literal::number_strategy::NumericLiteralStrategy;
 use crate::literal::string_strategy::StringLiteralStrategy;
+use crate::literal::struct_strategy::StructConstructorStrategy;
 use crate::literal::LiteralStrategy;
 use crate::whitespace::ws0;
 
@@ -40,6 +43,9 @@ impl PrimaryStrategy {
     pub fn new() -> Self {
         Self {
             literal_strategies: vec![
+                Box::new(BagConstructorStrategy),
+                Box::new(ListConstructorStrategy),
+                Box::new(StructConstructorStrategy),
                 Box::new(StringLiteralStrategy),
                 Box::new(NumericLiteralStrategy),
                 Box::new(NullMissingStrategy),
