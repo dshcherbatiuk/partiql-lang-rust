@@ -1,6 +1,6 @@
 # Winnow Parser Benchmark Report
 
-## Date: 2026-04-08 (v2)
+## Date: 2026-04-08 (v3)
 
 ## Environment
 - Apple Silicon (aarch64-apple-darwin)
@@ -11,17 +11,17 @@
 
 | Query | LALRPOP | Winnow | Speedup |
 |-------|---------|--------|---------|
-| `SELECT * FROM users` | 864ns | 364ns | **2.4x** |
-| `SELECT a, b, c FROM users WHERE a = 1` | 2.53µs | 1.21µs | **2.1x** |
-| `SELECT u.email FROM users u WHERE u.email = 'test@co'` | 2.30µs | 1.01µs | **2.3x** |
-| `SELECT * FROM "fde.users" WHERE email = 'test@co'` | 1.56µs | 657ns | **2.4x** |
-| `SELECT p.id, p.email FROM "fde.users" u, u.platformData p WHERE ...` | 4.28µs | 1.96µs | **2.2x** |
-| `SELECT * FROM users WHERE email IN ('a@co', 'b@co', 'c@co')` | 2.63µs | 1.09µs | **2.4x** |
-| `SELECT (15 cols) FROM "fde.users" u, u.platformData p WHERE ... AND ...` | 11.0µs | 5.46µs | **2.0x** |
-| `SELECT COUNT(*) FROM users WHERE active = true` | 2.13µs | 882ns | **2.4x** |
-| `SELECT ... GROUP BY ... HAVING ... ORDER BY ... LIMIT` | 3.94µs | 1.69µs | **2.3x** |
+| `SELECT * FROM users` | 863ns | 255ns | **3.4x** |
+| `SELECT a, b, c FROM users WHERE a = 1` | 2.51µs | 650ns | **3.9x** |
+| `SELECT u.email FROM users u WHERE u.email = 'test@co'` | 2.28µs | 722ns | **3.2x** |
+| `SELECT * FROM "fde.users" WHERE email = 'test@co'` | 1.55µs | 415ns | **3.7x** |
+| `SELECT p.id, p.email FROM "fde.users" u, u.platformData p WHERE ...` | 4.27µs | 1.42µs | **3.0x** |
+| `SELECT * FROM users WHERE email IN ('a@co', 'b@co', 'c@co')` | 2.60µs | 604ns | **4.3x** |
+| `SELECT (15 cols) FROM "fde.users" u, u.platformData p WHERE ... AND ...` | 10.9µs | 3.66µs | **3.0x** |
+| `SELECT COUNT(*) FROM users WHERE active = true` | 2.08µs | 538ns | **3.9x** |
+| `SELECT ... GROUP BY ... HAVING ... ORDER BY ... LIMIT` | 3.88µs | 944ns | **4.1x** |
 
-**Average speedup: 2.3x**
+**Average speedup: 3.6x**
 
 ## DML Queries — Winnow Only
 
@@ -29,14 +29,14 @@ LALRPOP parser doesn't support FDE DML syntax (INSERT INTO ... << >>).
 
 | Query | Winnow |
 |-------|--------|
-| `INSERT INTO users <<{...}>>` | 1.18µs |
-| `INSERT INTO "fde.users" <<{...}>>` | 1.44µs |
-| `INSERT INTO "fde.users" <<{... nested ...}>>` | 2.35µs |
-| `INSERT INTO users <<{...}, {...}, {...}>>` | 1.73µs |
-| `UPSERT INTO "fde.users" <<{...}>>` | 1.17µs |
-| `UPSERT INTO "fde.users" <<{... nested ...}>>` | 2.41µs |
-| `REPLACE INTO "fde.users" <<{... nested ...}>>` | 2.08µs |
-| `DELETE FROM "fde.users" WHERE email = 'test@co'` | 542ns |
+| `INSERT INTO users <<{...}>>` | 436ns |
+| `INSERT INTO "fde.users" <<{...}>>` | 519ns |
+| `INSERT INTO "fde.users" <<{... nested ...}>>` | 784ns |
+| `INSERT INTO users <<{...}, {...}, {...}>>` | 650ns |
+| `UPSERT INTO "fde.users" <<{...}>>` | 440ns |
+| `UPSERT INTO "fde.users" <<{... nested ...}>>` | 799ns |
+| `REPLACE INTO "fde.users" <<{... nested ...}>>` | 697ns |
+| `DELETE FROM "fde.users" WHERE email = 'test@co'` | 316ns |
 
 ## Key Optimizations Applied
 
@@ -53,13 +53,19 @@ LALRPOP parser doesn't support FDE DML syntax (INSERT INTO ... << >>).
 8. **Inline ASCII whitespace** — `ws()`/`ws0()` use byte loop instead of winnow scanner
 9. **`#[inline]` on hot paths** — `parse_single_lt`, `parse_single_gt`, identifier functions
 
+### Phase 3 (3.0-4.4x)
+10. **Pratt parser** — replaced 9-level recursive `ExprChain` with single-loop binding power parser. For literal `1`: 1 call instead of 9. For `a = 1 AND b = 2`: ~7 calls instead of ~45.
+11. **Byte-level operator dispatch** — `peek_infix` matches operators via `as_bytes()` without winnow combinators
+12. **Direct PrimaryStrategy call** — no ExprStrategy vtable indirection
+
 ## Benchmark History
 
 | Version | Avg Speedup | Key Change |
 |---------|-------------|------------|
 | v1 (initial) | 1.2-1.5x | Strategy + Chain of Responsibility pattern |
 | v2 (zero-alloc) | 1.8-2.1x | &str identifiers, first-char dispatch, borrowed joins |
-| v3 (byte-level) | **2.0-2.4x** | Byte-level kw(), Cell IDs, inline ASCII whitespace |
+| v3 (byte-level) | 2.0-2.4x | Byte-level kw(), Cell IDs, inline ASCII whitespace |
+| v4 (Pratt) | **3.0-4.4x** | Pratt parser replaces 9-level ExprChain |
 
 ## Methodology
 
