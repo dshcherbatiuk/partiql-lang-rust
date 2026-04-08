@@ -42,10 +42,6 @@ impl<'p> DmlStrategy for UpsertStrategy<'p> {
             returning: None,
         })
     }
-
-    fn name(&self) -> &str {
-        "upsert"
-    }
 }
 
 #[cfg(test)]

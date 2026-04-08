@@ -4,7 +4,7 @@
 //! delete ::= DELETE FROM expr [WHERE expr]
 //! ```
 
-use partiql_ast::ast::{self, Delete, Dml, DmlOp, FromClause, FromLet, FromLetKind, FromSource};
+use partiql_ast::ast::{self, Delete, Dml, DmlOp, FromClause};
 use winnow::prelude::*;
 
 use super::DmlStrategy;
@@ -48,10 +48,6 @@ impl<'p> DmlStrategy for DeleteStrategy<'p> {
             where_clause,
             returning: None,
         })
-    }
-
-    fn name(&self) -> &str {
-        "delete"
     }
 }
 

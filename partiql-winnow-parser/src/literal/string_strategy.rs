@@ -18,10 +18,6 @@ impl LiteralStrategy for StringLiteralStrategy {
         let s = string::sql_string.parse_next(input)?;
         Ok(ast::Expr::Lit(ctx.node(Lit::CharStringLit(s))))
     }
-
-    fn name(&self) -> &str {
-        "StringLiteral"
-    }
 }
 
 #[cfg(test)]

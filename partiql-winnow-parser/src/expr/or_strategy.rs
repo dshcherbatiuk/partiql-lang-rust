@@ -27,10 +27,6 @@ impl ExprStrategy for OrStrategy {
         }
         Ok(left)
     }
-
-    fn name(&self) -> &str {
-        "Or"
-    }
 }
 
 #[cfg(test)]

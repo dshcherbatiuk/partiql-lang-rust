@@ -17,10 +17,6 @@ impl LiteralStrategy for NullMissingStrategy {
         let _ = null::ion_null(input)?;
         Ok(ast::Expr::Lit(ctx.node(Lit::Null)))
     }
-
-    fn name(&self) -> &str {
-        "NullMissing"
-    }
 }
 
 #[cfg(test)]

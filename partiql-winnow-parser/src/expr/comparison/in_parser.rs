@@ -59,10 +59,6 @@ impl ComparisonParser for InParser {
             rhs: Box::new(rhs),
         })))
     }
-
-    fn name(&self) -> &str {
-        "IN"
-    }
 }
 
 #[cfg(test)]

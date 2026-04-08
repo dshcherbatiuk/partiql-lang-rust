@@ -18,10 +18,6 @@ impl LiteralStrategy for NumericLiteralStrategy {
             number::IonNumber::Float(f) => ast::Expr::Lit(ctx.node(Lit::DoubleLit(f))),
         })
     }
-
-    fn name(&self) -> &str {
-        "NumericLiteral"
-    }
 }
 
 #[cfg(test)]

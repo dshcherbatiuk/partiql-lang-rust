@@ -33,10 +33,6 @@ impl<'p> ProjectionClause<'p> {
 impl<'p> ClauseParser for ProjectionClause<'p> {
     type Output = Projection;
 
-    fn name(&self) -> &str {
-        "projection"
-    }
-
     fn parse(&self, input: &mut &str, pctx: &ParseContext) -> PResult<Projection> {
         if (kw("VALUE"), ws).parse_next(input).is_ok() {
             let expr = self.chain.parse_expr(input, pctx)?;

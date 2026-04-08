@@ -6,7 +6,7 @@
 
 use partiql_ast::ast;
 use partiql_ast::ast::{
-    BinOp, BinOpKind, Between, In, Like, Lit, Path, PathExpr, PathStep, UniOp, UniOpKind,
+    BinOp, BinOpKind, Lit, Path, PathExpr, PathStep, UniOp, UniOpKind,
 };
 use winnow::prelude::*;
 
@@ -18,7 +18,7 @@ use crate::expr::comparison::ComparisonParser;
 use crate::expr::primary_strategy::PrimaryStrategy;
 use crate::expr::StrategyContext;
 use crate::identifier;
-use crate::keyword::{ch, kw, lit};
+use crate::keyword::{ch, kw};
 use crate::parse_context::ParseContext;
 use crate::whitespace::{ws, ws0};
 

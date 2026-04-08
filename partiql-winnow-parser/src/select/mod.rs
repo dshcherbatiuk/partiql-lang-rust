@@ -45,6 +45,4 @@ pub trait ClauseParser {
     type Output;
 
     fn parse(&self, input: &mut &str, pctx: &ParseContext) -> PResult<Self::Output>;
-
-    fn name(&self) -> &str;
 }

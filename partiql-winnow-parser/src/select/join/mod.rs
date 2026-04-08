@@ -28,6 +28,4 @@ pub trait JoinParser {
         pctx: &ParseContext,
         left: &FromSource,
     ) -> PResult<FromSource>;
-
-    fn name(&self) -> &str;
 }

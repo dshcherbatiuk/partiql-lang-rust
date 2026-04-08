@@ -19,6 +19,8 @@
 //!
 //! Returns a zero-allocation `&str` slice from the input.
 
+#![allow(dead_code)] // Implemented but not yet wired into Pratt parser
+
 use winnow::combinator::alt;
 use winnow::prelude::*;
 use winnow::token::{take, take_while};

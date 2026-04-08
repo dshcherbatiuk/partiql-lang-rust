@@ -52,10 +52,6 @@ impl<'p> JoinParser for LeftJoinParser<'p> {
             predicate,
         })))
     }
-
-    fn name(&self) -> &str {
-        "left"
-    }
 }
 
 #[cfg(test)]

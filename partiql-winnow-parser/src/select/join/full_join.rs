@@ -52,10 +52,6 @@ impl<'p> JoinParser for FullJoinParser<'p> {
             predicate,
         })))
     }
-
-    fn name(&self) -> &str {
-        "full"
-    }
 }
 
 #[cfg(test)]

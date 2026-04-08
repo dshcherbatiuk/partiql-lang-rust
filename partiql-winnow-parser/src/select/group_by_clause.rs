@@ -31,10 +31,6 @@ impl<'p> GroupByClauseParser<'p> {
 impl<'p> ClauseParser for GroupByClauseParser<'p> {
     type Output = Box<AstNode<GroupByExpr>>;
 
-    fn name(&self) -> &str {
-        "group_by"
-    }
-
     fn parse(
         &self,
         input: &mut &str,

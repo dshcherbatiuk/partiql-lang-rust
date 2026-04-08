@@ -27,10 +27,6 @@ impl ExprStrategy for AndStrategy {
         }
         Ok(left)
     }
-
-    fn name(&self) -> &str {
-        "And"
-    }
 }
 
 #[cfg(test)]

@@ -42,10 +42,6 @@ impl LiteralStrategy for ListConstructorStrategy {
 
         Ok(ast::Expr::List(ctx.node(ast::List { values })))
     }
-
-    fn name(&self) -> &str {
-        "list"
-    }
 }
 
 #[cfg(test)]

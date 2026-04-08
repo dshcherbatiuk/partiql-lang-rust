@@ -59,10 +59,6 @@ impl ComparisonParser for IsParser {
             Ok(expr)
         }
     }
-
-    fn name(&self) -> &str {
-        "IS"
-    }
 }
 
 #[cfg(test)]

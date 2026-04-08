@@ -27,10 +27,6 @@ impl LiteralStrategy for BooleanLiteralStrategy {
 
         Ok(ast::Expr::Lit(ctx.node(Lit::BoolLit(b))))
     }
-
-    fn name(&self) -> &str {
-        "BooleanLiteral"
-    }
 }
 
 #[cfg(test)]

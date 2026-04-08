@@ -37,6 +37,7 @@ use winnow::token::take_while;
 ///
 /// Supports full Ion escape sequences: `\\`, `\"`, `\n`, `\t`, `\uXXXX`, etc.
 // BNF: short_string ::= '"' (char | escape)* '"'
+#[allow(dead_code)] // Available for backtick-delimited Ion literals
 pub fn ion_string(input: &mut &str) -> PResult<String> {
     let _ = '"'.parse_next(input)?;
     let mut result = String::new();

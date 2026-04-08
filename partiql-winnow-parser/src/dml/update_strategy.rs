@@ -109,10 +109,6 @@ impl<'p> DmlStrategy for UpdateStrategy<'p> {
             returning: None,
         })
     }
-
-    fn name(&self) -> &str {
-        "update"
-    }
 }
 
 #[cfg(test)]

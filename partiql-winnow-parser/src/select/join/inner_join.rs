@@ -52,10 +52,6 @@ impl<'p> JoinParser for InnerJoinParser<'p> {
             predicate,
         })))
     }
-
-    fn name(&self) -> &str {
-        "inner"
-    }
 }
 
 #[cfg(test)]

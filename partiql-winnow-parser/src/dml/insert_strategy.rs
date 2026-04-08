@@ -4,7 +4,7 @@
 //! insert ::= INSERT INTO expr expr
 //! ```
 
-use partiql_ast::ast::{self, ConflictAction, Dml, DmlOp, Insert, InsertValue, OnConflict};
+use partiql_ast::ast::{self, Dml, DmlOp, Insert};
 use winnow::prelude::*;
 
 use super::DmlStrategy;
@@ -41,10 +41,6 @@ impl<'p> DmlStrategy for InsertStrategy<'p> {
             where_clause: None,
             returning: None,
         })
-    }
-
-    fn name(&self) -> &str {
-        "insert"
     }
 }
 

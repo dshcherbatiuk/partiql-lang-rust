@@ -45,10 +45,6 @@ impl<'p> DmlStrategy for ReplaceStrategy<'p> {
             returning: None,
         })
     }
-
-    fn name(&self) -> &str {
-        "replace"
-    }
 }
 
 #[cfg(test)]

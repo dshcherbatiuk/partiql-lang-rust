@@ -161,7 +161,6 @@ pub fn ion_decimal<'a>(input: &mut &'a str) -> PResult<IonNumber> {
     }
 
     let raw = &start[..start.len() - input.len()];
-    let err = || backtrack();
 
     // Fast path: no underscores, no d-exponent, non-empty frac
     let needs_transform = raw.contains('_') || has_d_exp || frac.is_empty();

@@ -112,10 +112,6 @@ impl ExprStrategy for ComparisonStrategy {
 
         Ok(left)
     }
-
-    fn name(&self) -> &str {
-        "Comparison"
-    }
 }
 
 /// Match `<` but NOT `<<` (bag open) or `<=` or `<>`.

@@ -20,7 +20,6 @@ use crate::parse_context::ParseContext;
 /// Holds `&ExprChain` in the struct for expression delegation.
 pub trait DmlStrategy {
     fn parse(&self, input: &mut &str, pctx: &ParseContext) -> PResult<ast::Dml>;
-    fn name(&self) -> &str;
 }
 
 /// DML parser — chains DmlStrategy implementations.

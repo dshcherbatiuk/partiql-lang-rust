@@ -26,10 +26,6 @@ impl ExprStrategy for NotStrategy {
             ctx.parse_next_level(input)
         }
     }
-
-    fn name(&self) -> &str {
-        "Not"
-    }
 }
 
 #[cfg(test)]

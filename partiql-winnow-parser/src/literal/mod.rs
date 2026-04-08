@@ -58,5 +58,4 @@ use winnow::prelude::*;
 /// implements this. Used by PrimaryStrategy's internal chain.
 pub trait LiteralStrategy {
     fn parse<'a>(&self, input: &mut &'a str, ctx: &StrategyContext<'_>) -> PResult<ast::Expr>;
-    fn name(&self) -> &str;
 }

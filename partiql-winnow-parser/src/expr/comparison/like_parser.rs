@@ -46,10 +46,6 @@ impl ComparisonParser for LikeParser {
             escape,
         })))
     }
-
-    fn name(&self) -> &str {
-        "LIKE"
-    }
 }
 
 #[cfg(test)]

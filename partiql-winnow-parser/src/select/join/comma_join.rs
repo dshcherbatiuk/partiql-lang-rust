@@ -42,10 +42,6 @@ impl<'p> JoinParser for CommaJoinParser<'p> {
             predicate: None,
         })))
     }
-
-    fn name(&self) -> &str {
-        "comma"
-    }
 }
 
 #[cfg(test)]

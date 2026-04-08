@@ -28,10 +28,6 @@ impl<'p> LimitOffsetClauseParser<'p> {
 impl<'p> ClauseParser for LimitOffsetClauseParser<'p> {
     type Output = Box<AstNode<LimitOffsetClause>>;
 
-    fn name(&self) -> &str {
-        "limit_offset"
-    }
-
     /// Parses LIMIT/OFFSET in either order.
     /// Called after detecting LIMIT or OFFSET keyword in `select_parser`.
     fn parse(

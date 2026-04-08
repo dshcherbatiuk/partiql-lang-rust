@@ -140,10 +140,6 @@ impl ExprStrategy for PrimaryStrategy {
     fn parse<'a>(&self, input: &mut &'a str, ctx: &StrategyContext<'_>) -> PResult<ast::Expr> {
         self.parse_primary(input, ctx)
     }
-
-    fn name(&self) -> &str {
-        "Primary"
-    }
 }
 
 fn parse_paren_expr<'a>(input: &mut &'a str, ctx: &StrategyContext<'_>) -> PResult<ast::Expr> {

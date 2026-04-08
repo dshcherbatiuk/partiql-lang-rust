@@ -33,10 +33,6 @@ impl LiteralStrategy for CaseExprStrategy {
             parse_simple_case(input, ctx)
         }
     }
-
-    fn name(&self) -> &str {
-        "case"
-    }
 }
 
 /// CASE expr WHEN expr THEN expr [WHEN ...] [ELSE expr] END

@@ -25,10 +25,6 @@ impl<'p> HavingClauseParser<'p> {
 impl<'p> ClauseParser for HavingClauseParser<'p> {
     type Output = Box<AstNode<HavingClause>>;
 
-    fn name(&self) -> &str {
-        "having"
-    }
-
     fn parse(
         &self,
         input: &mut &str,

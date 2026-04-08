@@ -25,6 +25,4 @@ pub trait ComparisonParser {
         ctx: &StrategyContext<'_>,
         left: &ast::Expr,
     ) -> PResult<ast::Expr>;
-
-    fn name(&self) -> &str;
 }

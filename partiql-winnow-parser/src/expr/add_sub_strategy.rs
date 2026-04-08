@@ -38,10 +38,6 @@ impl ExprStrategy for AddSubStrategy {
         }
         Ok(left)
     }
-
-    fn name(&self) -> &str {
-        "AddSub"
-    }
 }
 
 #[cfg(test)]

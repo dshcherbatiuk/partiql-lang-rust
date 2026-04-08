@@ -42,10 +42,6 @@ impl ComparisonParser for BetweenParser {
             to: Box::new(to),
         })))
     }
-
-    fn name(&self) -> &str {
-        "BETWEEN"
-    }
 }
 
 #[cfg(test)]

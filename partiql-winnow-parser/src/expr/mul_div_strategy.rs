@@ -38,10 +38,6 @@ impl ExprStrategy for MulDivStrategy {
         }
         Ok(left)
     }
-
-    fn name(&self) -> &str {
-        "MulDiv"
-    }
 }
 
 #[cfg(test)]

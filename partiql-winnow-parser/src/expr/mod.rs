@@ -75,7 +75,6 @@ impl<'c> StrategyContext<'c> {
 /// Each precedence level implements this trait.
 pub trait ExprStrategy {
     fn parse<'a>(&self, input: &mut &'a str, ctx: &StrategyContext<'_>) -> PResult<ast::Expr>;
-    fn name(&self) -> &str;
 }
 
 /// Expression parser — delegates to PrattParser.

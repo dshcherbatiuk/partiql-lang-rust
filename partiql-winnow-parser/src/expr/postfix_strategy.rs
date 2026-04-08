@@ -48,10 +48,6 @@ impl ExprStrategy for PostfixStrategy {
             })))
         }
     }
-
-    fn name(&self) -> &str {
-        "Postfix"
-    }
 }
 
 #[cfg(test)]

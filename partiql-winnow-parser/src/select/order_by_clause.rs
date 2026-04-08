@@ -30,10 +30,6 @@ impl<'p> OrderByClauseParser<'p> {
 impl<'p> ClauseParser for OrderByClauseParser<'p> {
     type Output = Box<AstNode<OrderByExpr>>;
 
-    fn name(&self) -> &str {
-        "order_by"
-    }
-
     fn parse(
         &self,
         input: &mut &str,

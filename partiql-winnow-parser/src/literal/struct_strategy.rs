@@ -55,10 +55,6 @@ impl LiteralStrategy for StructConstructorStrategy {
 
         Ok(ast::Expr::Struct(ctx.node(ast::Struct { fields })))
     }
-
-    fn name(&self) -> &str {
-        "struct"
-    }
 }
 
 #[cfg(test)]

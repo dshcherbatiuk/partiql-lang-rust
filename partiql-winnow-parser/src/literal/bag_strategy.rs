@@ -45,10 +45,6 @@ impl LiteralStrategy for BagConstructorStrategy {
 
         Ok(ast::Expr::Bag(ctx.node(ast::Bag { values })))
     }
-
-    fn name(&self) -> &str {
-        "bag"
-    }
 }
 
 #[cfg(test)]

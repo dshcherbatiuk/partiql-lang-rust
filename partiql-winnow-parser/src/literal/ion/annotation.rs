@@ -12,6 +12,8 @@
 //!
 //! Examples: `dollars::100`, `a::b::42`, `'custom type'::null`
 
+#![allow(dead_code)] // Implemented but not yet wired into Pratt parser
+
 use super::string::parse_escape_char;
 use crate::identifier::unquoted_identifier;
 use crate::keyword::lit;

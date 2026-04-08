@@ -13,14 +13,13 @@
 //! a CROSS JOIN where the right side is a Path expression.
 
 use partiql_ast::ast::{
-    AstNode, CaseSensitivity, FromClause, FromLet, FromLetKind, FromSource, Join, JoinKind,
-    JoinSpec, SymbolPrimitive,
+    AstNode, CaseSensitivity, FromClause, FromLet, FromLetKind, FromSource, SymbolPrimitive,
 };
 use winnow::prelude::*;
 
 use crate::expr::ExprChain;
 use crate::identifier;
-use crate::keyword::{ch, kw};
+use crate::keyword::kw;
 use crate::parse_context::ParseContext;
 use crate::whitespace::{ws, ws0};
 
@@ -145,10 +144,6 @@ impl<'p> FromClauseParser<'p> {
 
 impl<'p> ClauseParser for FromClauseParser<'p> {
     type Output = AstNode<FromClause>;
-
-    fn name(&self) -> &str {
-        "from"
-    }
 
     fn parse(&self, input: &mut &str, pctx: &ParseContext) -> PResult<AstNode<FromClause>> {
         let mut source = parse_source(input, self.chain, pctx)?;

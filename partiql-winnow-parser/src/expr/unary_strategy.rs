@@ -34,10 +34,6 @@ impl ExprStrategy for UnaryStrategy {
             ctx.parse_next_level(input)
         }
     }
-
-    fn name(&self) -> &str {
-        "Unary"
-    }
 }
 
 #[cfg(test)]

@@ -41,10 +41,6 @@ impl<'p> JoinParser for CrossJoinParser<'p> {
             predicate: None,
         })))
     }
-
-    fn name(&self) -> &str {
-        "cross"
-    }
 }
 
 #[cfg(test)]

@@ -25,10 +25,6 @@ impl<'p> WhereClauseParser<'p> {
 impl<'p> ClauseParser for WhereClauseParser<'p> {
     type Output = Box<AstNode<WhereClause>>;
 
-    fn name(&self) -> &str {
-        "where"
-    }
-
     fn parse(
         &self,
         input: &mut &str,
