@@ -127,6 +127,10 @@ pub enum DmlOp {
     Insert(Insert),
     /// `INSERT INTO <expr> VALUE <expr> [AT <expr>]` [ON CONFLICT WHERE <expr> DO NOTHING]`
     InsertValue(InsertValue),
+    /// `REPLACE INTO <expr> <expr>` — complete overwrite semantics
+    Replace(Insert),
+    /// `UPSERT INTO <expr> <expr>` — merge semantics (adds/updates fields)
+    Upsert(Insert),
     /// `SET <assignment>...`
     Set(Set),
     /// `REMOVE <expr>`
@@ -216,20 +220,71 @@ pub struct Remove {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Delete {}
 
-/// `ON CONFLICT <expr> <conflict_action>`
+/// `ON CONFLICT [target] <conflict_action>`
 #[derive(Visit, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct OnConflict {
     pub expr: Box<Expr>,
     #[visit(skip)]
+    pub target: Option<ConflictTarget>,
+    #[visit(skip)]
     pub conflict_action: ConflictAction,
 }
 
-/// `CONFLICT_ACTION <action>`
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// Conflict target — which constraint to check for conflicts.
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum ConflictTarget {
+    /// `ON CONFLICT (col1, col2, ...)`
+    Columns(Vec<String>),
+    /// `ON CONFLICT ON CONSTRAINT constraint_name`
+    Constraint(String),
+}
+
+/// Conflict action — what to do when a conflict is detected.
+#[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum ConflictAction {
+    /// `DO NOTHING`
     DoNothing,
+    /// `DO UPDATE EXCLUDED [WHERE expr]`
+    DoUpdateExcluded { where_clause: Option<Box<Expr>> },
+    /// `DO UPDATE SET col = expr, ... [WHERE expr]`
+    DoUpdateSet {
+        set_clauses: Vec<SetClause>,
+        where_clause: Option<Box<Expr>>,
+    },
+    /// `DO REPLACE EXCLUDED [WHERE expr]`
+    DoReplaceExcluded { where_clause: Option<Box<Expr>> },
+    /// `DO REPLACE VALUE expr [WHERE expr]`
+    DoReplaceValue {
+        value: Box<Expr>,
+        where_clause: Option<Box<Expr>>,
+    },
+}
+
+/// SET clause: `column = extended_expr`
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct SetClause {
+    pub column: String,
+    pub expr: ExtendedExpr,
+}
+
+/// Extended expression — standard PartiQL expr or custom merge function call.
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum ExtendedExpr {
+    PartiQL(Box<Expr>),
+    FunctionCall(MergeFunction),
+}
+
+/// Custom merge function call: `array_union(arg1, arg2)`, `map_merge(arg1, arg2)`
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct MergeFunction {
+    pub function_name: String,
+    pub arguments: Vec<Box<Expr>>,
 }
 
 // Evaluation order

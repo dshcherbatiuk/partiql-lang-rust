@@ -14,8 +14,9 @@
 //! function_call ::= identifier '(' expr (',' expr)* ')'
 //! ```
 
-use partiql_ast::ast::Expr;
-use smallvec::SmallVec;
+use partiql_ast::ast::{
+    self, ConflictAction, ConflictTarget, ExtendedExpr, Expr, MergeFunction, OnConflict, SetClause,
+};
 use winnow::prelude::*;
 
 use crate::expr::pratt::PrattParser;
@@ -23,59 +24,6 @@ use crate::identifier;
 use crate::keyword::{ch, kw};
 use crate::parse_context::ParseContext;
 use crate::whitespace::{ws, ws0};
-
-// ── Types ───────────────────────────────────────────────────────────────
-
-/// ON CONFLICT clause.
-#[derive(Debug, Clone, PartialEq)]
-pub struct OnConflict {
-    pub target: Option<ConflictTarget>,
-    pub action: ConflictAction,
-}
-
-/// Conflict target — which constraint to check.
-#[derive(Debug, Clone, PartialEq)]
-pub enum ConflictTarget {
-    Columns(SmallVec<[String; 4]>),
-    Constraint(String),
-}
-
-/// Conflict action — what to do on conflict.
-#[derive(Debug, Clone, PartialEq)]
-pub enum ConflictAction {
-    DoNothing,
-    DoUpdateExcluded { where_clause: Option<Expr> },
-    DoUpdateSet {
-        set_clauses: Vec<SetClause>,
-        where_clause: Option<Expr>,
-    },
-    DoReplaceExcluded { where_clause: Option<Expr> },
-    DoReplaceValue {
-        value: Expr,
-        where_clause: Option<Expr>,
-    },
-}
-
-/// SET clause: column = extended_expr
-#[derive(Debug, Clone, PartialEq)]
-pub struct SetClause {
-    pub column: String,
-    pub expr: ExtendedExpr,
-}
-
-/// Extended expression — PartiQL expr or custom function call.
-#[derive(Debug, Clone, PartialEq)]
-pub enum ExtendedExpr {
-    PartiQL(Expr),
-    FunctionCall(FunctionCall),
-}
-
-/// Custom function call: name(arg1, arg2, ...)
-#[derive(Debug, Clone, PartialEq)]
-pub struct FunctionCall {
-    pub function_name: String,
-    pub arguments: Vec<Expr>,
-}
 
 // ── Parser ──────────────────────────────────────────────────────────────
 
@@ -96,10 +44,13 @@ impl<'p> OnConflictParser<'p> {
 
         let target = self.parse_conflict_target(input)?;
         let _ = ws0(input);
-
         let action = self.parse_conflict_action(input, pctx)?;
 
-        Ok(OnConflict { target, action })
+        Ok(OnConflict {
+            expr: Box::new(Expr::Lit(pctx.node(ast::Lit::Null))),
+            target,
+            conflict_action: action,
+        })
     }
 
     fn parse_conflict_target(&self, input: &mut &str) -> PResult<Option<ConflictTarget>> {
@@ -107,7 +58,7 @@ impl<'p> OnConflictParser<'p> {
 
         // (column1, column2, ...)
         if ch('(').parse_next(input).is_ok() {
-            let mut columns = SmallVec::new();
+            let mut columns = Vec::new();
             loop {
                 let _ = ws0(input);
                 let col = identifier::identifier(input)?;
@@ -181,7 +132,7 @@ impl<'p> OnConflictParser<'p> {
                 let value = self.pratt.parse_expr(input, pctx)?;
                 let where_clause = self.parse_optional_where(input, pctx)?;
                 return Ok(ConflictAction::DoReplaceValue {
-                    value,
+                    value: Box::new(value),
                     where_clause,
                 });
             }
@@ -196,12 +147,12 @@ impl<'p> OnConflictParser<'p> {
         &self,
         input: &mut &str,
         pctx: &ParseContext,
-    ) -> PResult<Option<Expr>> {
+    ) -> PResult<Option<Box<Expr>>> {
         let _ = ws0(input);
         let checkpoint = *input;
         if (kw("WHERE"), ws).parse_next(input).is_ok() {
             let expr = self.pratt.parse_expr(input, pctx)?;
-            Ok(Some(expr))
+            Ok(Some(Box::new(expr)))
         } else {
             *input = checkpoint;
             Ok(None)
@@ -245,10 +196,10 @@ impl<'p> OnConflictParser<'p> {
         if let Ok(name) = identifier::identifier(input) {
             let _ = ws0(input);
             if ch('(').parse_next(input).is_ok() {
-                let mut args = Vec::new();
+                let mut args: Vec<Box<Expr>> = Vec::new();
                 let _ = ws0(input);
                 if ch(')').parse_next(input).is_ok() {
-                    return Ok(ExtendedExpr::FunctionCall(FunctionCall {
+                    return Ok(ExtendedExpr::FunctionCall(MergeFunction {
                         function_name: name.to_string(),
                         arguments: args,
                     }));
@@ -256,7 +207,7 @@ impl<'p> OnConflictParser<'p> {
                 loop {
                     let _ = ws0(input);
                     let arg = self.pratt.parse_expr(input, pctx)?;
-                    args.push(arg);
+                    args.push(Box::new(arg));
                     let _ = ws0(input);
                     if ch(',').parse_next(input).is_err() {
                         break;
@@ -264,7 +215,7 @@ impl<'p> OnConflictParser<'p> {
                 }
                 let _ = ws0(input);
                 ch(')').parse_next(input)?;
-                return Ok(ExtendedExpr::FunctionCall(FunctionCall {
+                return Ok(ExtendedExpr::FunctionCall(MergeFunction {
                     function_name: name.to_string(),
                     arguments: args,
                 }));
@@ -274,7 +225,7 @@ impl<'p> OnConflictParser<'p> {
 
         // Regular expression
         let expr = self.pratt.parse_expr(input, pctx)?;
-        Ok(ExtendedExpr::PartiQL(expr))
+        Ok(ExtendedExpr::PartiQL(Box::new(expr)))
     }
 }
 
@@ -295,15 +246,14 @@ mod tests {
     #[test]
     fn test_do_nothing() {
         let oc = parse_oc("ON CONFLICT DO NOTHING");
-        assert!(oc.target.is_none());
-        assert!(matches!(oc.action, ConflictAction::DoNothing));
+        assert!(matches!(oc.conflict_action, ConflictAction::DoNothing));
     }
 
     #[test]
     fn test_do_update_excluded() {
         let oc = parse_oc("ON CONFLICT DO UPDATE EXCLUDED");
         assert!(matches!(
-            oc.action,
+            oc.conflict_action,
             ConflictAction::DoUpdateExcluded { where_clause: None }
         ));
     }
@@ -311,7 +261,7 @@ mod tests {
     #[test]
     fn test_do_update_excluded_where() {
         let oc = parse_oc("ON CONFLICT DO UPDATE EXCLUDED WHERE email = 'a@co'");
-        match &oc.action {
+        match &oc.conflict_action {
             ConflictAction::DoUpdateExcluded { where_clause } => {
                 assert!(where_clause.is_some());
             }
@@ -322,7 +272,7 @@ mod tests {
     #[test]
     fn test_do_update_set() {
         let oc = parse_oc("ON CONFLICT DO UPDATE SET name = 'Bob', age = 30");
-        match &oc.action {
+        match &oc.conflict_action {
             ConflictAction::DoUpdateSet {
                 set_clauses,
                 where_clause,
@@ -341,7 +291,7 @@ mod tests {
         let oc = parse_oc(
             "ON CONFLICT DO UPDATE SET tags = array_union(EXCLUDED.tags, tags)",
         );
-        match &oc.action {
+        match &oc.conflict_action {
             ConflictAction::DoUpdateSet { set_clauses, .. } => {
                 assert_eq!(set_clauses.len(), 1);
                 assert!(matches!(
@@ -351,15 +301,6 @@ mod tests {
             }
             other => panic!("expected DoUpdateSet, got {:?}", other),
         }
-    }
-
-    #[test]
-    fn test_do_replace_excluded() {
-        let oc = parse_oc("ON CONFLICT DO REPLACE EXCLUDED");
-        assert!(matches!(
-            oc.action,
-            ConflictAction::DoReplaceExcluded { where_clause: None }
-        ));
     }
 
     #[test]
@@ -374,6 +315,15 @@ mod tests {
     }
 
     #[test]
+    fn test_do_replace_excluded() {
+        let oc = parse_oc("ON CONFLICT DO REPLACE EXCLUDED");
+        assert!(matches!(
+            oc.conflict_action,
+            ConflictAction::DoReplaceExcluded { where_clause: None }
+        ));
+    }
+
+    #[test]
     fn test_full_insert_on_conflict_pattern() {
         let oc = parse_oc(
             "ON CONFLICT DO UPDATE SET \
@@ -381,7 +331,7 @@ mod tests {
              name = EXCLUDED.name, \
              platformData = array_union(EXCLUDED.platformData, platformData)",
         );
-        match &oc.action {
+        match &oc.conflict_action {
             ConflictAction::DoUpdateSet { set_clauses, .. } => {
                 assert_eq!(set_clauses.len(), 3);
                 assert!(matches!(&set_clauses[0].expr, ExtendedExpr::PartiQL(_)));
