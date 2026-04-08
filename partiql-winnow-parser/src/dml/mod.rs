@@ -6,6 +6,7 @@
 
 pub mod delete_strategy;
 pub mod insert_strategy;
+pub mod on_conflict;
 pub mod replace_strategy;
 pub mod update_strategy;
 pub mod upsert_strategy;
