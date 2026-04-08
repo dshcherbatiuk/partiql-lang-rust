@@ -21,7 +21,7 @@ use crate::parse_context::ParseContext;
 /// Holds `&ExprChain` in the struct. Receives the already-parsed
 /// `left` source and attempts to match its join keyword.
 /// Returns `Backtrack` if this join doesn't match.
-pub trait JoinParser {
+pub trait JoinParser: Send + Sync {
     fn parse(
         &self,
         input: &mut &str,

@@ -18,7 +18,7 @@ use crate::parse_context::ParseContext;
 
 /// Each DML type implements this trait.
 /// Holds `&ExprChain` in the struct for expression delegation.
-pub trait DmlStrategy {
+pub trait DmlStrategy: Send + Sync {
     fn parse(&self, input: &mut &str, pctx: &ParseContext) -> PResult<ast::Dml>;
 }
 

@@ -41,7 +41,7 @@ use crate::parse_context::ParseContext;
 /// `Output` is the clause-specific AST node (e.g., `Projection`, `AstNode<FromClause>`).
 /// Clause parsers are stateless — they hold `&ExprChain` for expression delegation
 /// and receive `&ParseContext` per parse call for mutable state.
-pub trait ClauseParser {
+pub trait ClauseParser: Send + Sync {
     type Output;
 
     fn parse(&self, input: &mut &str, pctx: &ParseContext) -> PResult<Self::Output>;

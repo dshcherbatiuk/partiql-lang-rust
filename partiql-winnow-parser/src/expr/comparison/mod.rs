@@ -18,7 +18,7 @@ use super::StrategyContext;
 /// Receives the already-parsed `left` operand and attempts to parse
 /// the rest (e.g., `IS NULL`, `IN (...)`, `LIKE '%foo'`, `BETWEEN 1 AND 10`).
 /// Returns `Backtrack` if this form doesn't match.
-pub trait ComparisonParser {
+pub trait ComparisonParser: Send + Sync {
     fn parse<'a>(
         &self,
         input: &mut &'a str,

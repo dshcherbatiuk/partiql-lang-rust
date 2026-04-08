@@ -56,6 +56,6 @@ use winnow::prelude::*;
 
 /// Strategy trait for literal parsing. Each Ion/SQL literal type
 /// implements this. Used by PrimaryStrategy's internal chain.
-pub trait LiteralStrategy {
+pub trait LiteralStrategy: Send + Sync {
     fn parse<'a>(&self, input: &mut &'a str, ctx: &StrategyContext<'_>) -> PResult<ast::Expr>;
 }
