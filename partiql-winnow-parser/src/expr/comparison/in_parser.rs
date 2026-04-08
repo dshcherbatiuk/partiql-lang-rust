@@ -30,29 +30,28 @@ impl ComparisonParser for InParser {
             ));
         }
 
-        if ch('(').parse_next(input).is_err() {
-            *input = checkpoint;
-            return Err(winnow::error::ErrMode::Backtrack(
-                winnow::error::ContextError::new(),
-            ));
-        }
-
-        let mut items = Vec::new();
-        loop {
-            let _ = ws0(input);
-            let expr = ctx.parse_expr(input)?;
-            items.push(expr);
-            let _ = ws0(input);
-            if ch(',').parse_next(input).is_err() {
-                break;
+        // IN (expr, ...) — parenthesized list
+        // IN [expr, ...] — bracket list (parsed as List by expression parser)
+        // IN expr        — any expression
+        let rhs = if ch('(').parse_next(input).is_ok() {
+            let mut items = Vec::new();
+            loop {
+                let _ = ws0(input);
+                let expr = ctx.parse_expr(input)?;
+                items.push(expr);
+                let _ = ws0(input);
+                if ch(',').parse_next(input).is_err() {
+                    break;
+                }
             }
-        }
-        let _ = ws0(input);
-        ch(')').parse_next(input)?;
-
-        let rhs = ast::Expr::List(ctx.node(ast::List {
-            values: items.into_iter().map(|e| Box::new(e)).collect(),
-        }));
+            let _ = ws0(input);
+            ch(')').parse_next(input)?;
+            ast::Expr::List(ctx.node(ast::List {
+                values: items.into_iter().map(|e| Box::new(e)).collect(),
+            }))
+        } else {
+            ctx.parse_next_level(input)?
+        };
 
         Ok(ast::Expr::In(ctx.node(In {
             lhs: Box::new(left.clone()),
