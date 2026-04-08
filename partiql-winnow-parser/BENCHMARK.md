@@ -38,6 +38,16 @@
 | `REPLACE INTO "fde.users" <<{... nested ...}>>` | 2.08µs | **691ns** | 3.0x |
 | `DELETE FROM "fde.users" WHERE email = 'test@co'` | 542ns | **317ns** | 1.7x |
 
+## ON CONFLICT Queries — Winnow
+
+| Query | Time |
+|-------|------|
+| `ON CONFLICT DO NOTHING` | **21ns** |
+| `ON CONFLICT DO REPLACE EXCLUDED` | **35ns** |
+| `ON CONFLICT DO UPDATE EXCLUDED WHERE email = '...'` | **157ns** |
+| `ON CONFLICT DO UPDATE SET name = '...', age = 30` | **224ns** |
+| `ON CONFLICT DO UPDATE SET ... = EXCLUDED..., ... = array_union(...)` (3 clauses + merge fn) | **796ns** |
+
 ## Key Optimizations Applied
 
 ### Phase 1 (1.8-2.1x)
