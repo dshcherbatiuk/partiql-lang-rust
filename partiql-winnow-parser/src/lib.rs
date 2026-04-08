@@ -6,6 +6,7 @@
 //! Each BNF rule from the PartiQL spec maps to one Rust function.
 //! Strategy pattern for expressions, SELECT clauses, and DML statements.
 
+pub mod dml;
 pub mod expr;
 mod identifier;
 mod keyword;

@@ -42,6 +42,7 @@
 
 pub mod bag_strategy;
 pub mod boolean_strategy;
+pub mod case_strategy;
 pub mod ion;
 pub mod list_strategy;
 pub mod null_strategy;

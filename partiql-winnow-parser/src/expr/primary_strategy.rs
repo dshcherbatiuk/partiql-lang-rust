@@ -27,6 +27,7 @@ use crate::identifier;
 use crate::keyword::ch;
 use crate::literal::bag_strategy::BagConstructorStrategy;
 use crate::literal::boolean_strategy::BooleanLiteralStrategy;
+use crate::literal::case_strategy::CaseExprStrategy;
 use crate::literal::list_strategy::ListConstructorStrategy;
 use crate::literal::null_strategy::NullMissingStrategy;
 use crate::literal::number_strategy::NumericLiteralStrategy;
@@ -46,6 +47,7 @@ impl PrimaryStrategy {
                 Box::new(BagConstructorStrategy),
                 Box::new(ListConstructorStrategy),
                 Box::new(StructConstructorStrategy),
+                Box::new(CaseExprStrategy),
                 Box::new(StringLiteralStrategy),
                 Box::new(NumericLiteralStrategy),
                 Box::new(NullMissingStrategy),
