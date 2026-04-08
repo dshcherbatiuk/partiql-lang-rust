@@ -125,8 +125,10 @@ pub struct Dml {
 pub enum DmlOp {
     /// `INSERT INTO <expr> <expr>`
     Insert(Insert),
-    /// `INSERT INTO <expr> VALUE <expr> [AT <expr>]` [ON CONFLICT WHERE <expr> DO NOTHING]`
+    /// `INSERT INTO <expr> VALUE <expr> [AT <expr>] [ON CONFLICT ...]`
     InsertValue(InsertValue),
+    /// `INSERT INTO <expr> <expr> ON CONFLICT ...` — insert with conflict resolution
+    InsertOnConflict(InsertOnConflict),
     /// `REPLACE INTO <expr> <expr>` — complete overwrite semantics
     Replace(Insert),
     /// `UPSERT INTO <expr> <expr>` — merge semantics (adds/updates fields)
@@ -137,6 +139,15 @@ pub enum DmlOp {
     Remove(Remove),
     /// DELETE
     Delete(Delete),
+}
+
+/// `INSERT INTO <expr> <expr> ON CONFLICT ...`
+#[derive(Visit, Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct InsertOnConflict {
+    pub target: Box<Expr>,
+    pub values: Box<Expr>,
+    pub on_conflict: OnConflict,
 }
 
 /// `RETURNING (<returning_elem> [, <returning_elem>]...)`

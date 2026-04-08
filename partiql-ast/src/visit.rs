@@ -177,6 +177,18 @@ pub trait Visitor<'ast> {
     fn exit_insert_value(&mut self, _insert_value: &'ast ast::InsertValue) -> Traverse {
         Traverse::Continue
     }
+    fn enter_insert_on_conflict(
+        &mut self,
+        _insert_on_conflict: &'ast ast::InsertOnConflict,
+    ) -> Traverse {
+        Traverse::Continue
+    }
+    fn exit_insert_on_conflict(
+        &mut self,
+        _insert_on_conflict: &'ast ast::InsertOnConflict,
+    ) -> Traverse {
+        Traverse::Continue
+    }
     fn enter_set(&mut self, _set: &'ast ast::Set) -> Traverse {
         Traverse::Continue
     }
