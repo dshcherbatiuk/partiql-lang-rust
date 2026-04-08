@@ -35,7 +35,11 @@
 use winnow::error::ContextError;
 use winnow::prelude::*;
 
-/// Match a SQL keyword case-insensitively.
+/// Match a SQL keyword case-insensitively with word boundary enforcement.
+///
+/// After matching the keyword, verifies the next character is NOT alphanumeric
+/// or underscore — preventing `OR` from matching the prefix of `ORDER`,
+/// `IN` from matching `INSERT`, etc.
 ///
 /// Does NOT consume trailing whitespace — caller controls whitespace rules.
 ///
@@ -44,7 +48,19 @@ use winnow::prelude::*;
 /// keyword ::= SELECT | FROM | WHERE | INSERT | INTO | DELETE | ...
 /// ```
 pub fn kw<'a>(keyword: &'static str) -> impl Parser<&'a str, &'a str, ContextError> {
-    winnow::ascii::Caseless(keyword)
+    move |input: &mut &'a str| {
+        let checkpoint = *input;
+        let matched = winnow::ascii::Caseless(keyword).parse_next(input)?;
+        // Check word boundary — next char must not be alphanumeric or underscore.
+        // Prevents `OR` from matching prefix of `ORDER`, `IN` from `INSERT`, etc.
+        if let Some(next) = input.chars().next() {
+            if next.is_ascii_alphanumeric() || next == '_' {
+                *input = checkpoint;
+                return Err(winnow::error::ErrMode::Backtrack(ContextError::new()));
+            }
+        }
+        Ok(matched)
+    }
 }
 
 /// Match a single character with explicit error type.
@@ -84,10 +100,30 @@ mod tests {
     }
 
     #[test]
-    fn test_partial_match_needs_boundary() {
-        // kw matches prefix — caller must check word boundary with ws
+    fn test_word_boundary_enforced() {
+        // kw does NOT match prefix — word boundary prevents `SELECT` from matching `SELECTING`
         let mut i = "SELECTING rest";
+        assert!(kw("SELECT").parse_next(&mut i).is_err());
+        assert_eq!(i, "SELECTING rest"); // input unchanged
+    }
+
+    #[test]
+    fn test_word_boundary_allows_non_alpha() {
+        // kw matches when followed by whitespace, punctuation, or EOF
+        let mut i = "SELECT rest";
         assert!(kw("SELECT").parse_next(&mut i).is_ok());
-        assert_eq!(i, "ING rest");
+
+        let mut i = "SELECT(";
+        assert!(kw("SELECT").parse_next(&mut i).is_ok());
+
+        let mut i = "SELECT";
+        assert!(kw("SELECT").parse_next(&mut i).is_ok());
+    }
+
+    #[test]
+    fn test_or_not_matching_order() {
+        let mut i = "ORDER BY";
+        assert!(kw("OR").parse_next(&mut i).is_err());
+        assert_eq!(i, "ORDER BY"); // input unchanged
     }
 }

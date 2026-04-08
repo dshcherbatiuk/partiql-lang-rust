@@ -48,7 +48,7 @@ impl ExprStrategy for MulDivStrategy {
 mod tests {
     use crate::expr::ExprChain;
     use partiql_ast::ast;
-    use partiql_ast::ast::BinOpKind;
+    use partiql_ast::ast::{BinOpKind, Lit};
 
     fn parse(input: &str) -> ast::Expr {
         let chain = ExprChain::new();
@@ -60,19 +60,58 @@ mod tests {
     #[test]
     fn test_mul() {
         let expr = parse("2 * 3");
-        assert!(matches!(&expr, ast::Expr::BinOp(n) if n.node.kind == BinOpKind::Mul));
+        match &expr {
+            ast::Expr::BinOp(n) => {
+                assert_eq!(n.node.kind, BinOpKind::Mul);
+                assert!(matches!(
+                    &*n.node.lhs,
+                    ast::Expr::Lit(lit) if matches!(lit.node, Lit::Int64Lit(2))
+                ));
+                assert!(matches!(
+                    &*n.node.rhs,
+                    ast::Expr::Lit(lit) if matches!(lit.node, Lit::Int64Lit(3))
+                ));
+            }
+            _ => panic!("expected BinOp"),
+        }
     }
 
     #[test]
     fn test_div() {
         let expr = parse("6 / 2");
-        assert!(matches!(&expr, ast::Expr::BinOp(n) if n.node.kind == BinOpKind::Div));
+        match &expr {
+            ast::Expr::BinOp(n) => {
+                assert_eq!(n.node.kind, BinOpKind::Div);
+                assert!(matches!(
+                    &*n.node.lhs,
+                    ast::Expr::Lit(lit) if matches!(lit.node, Lit::Int64Lit(6))
+                ));
+                assert!(matches!(
+                    &*n.node.rhs,
+                    ast::Expr::Lit(lit) if matches!(lit.node, Lit::Int64Lit(2))
+                ));
+            }
+            _ => panic!("expected BinOp"),
+        }
     }
 
     #[test]
     fn test_mod() {
         let expr = parse("7 % 3");
-        assert!(matches!(&expr, ast::Expr::BinOp(n) if n.node.kind == BinOpKind::Mod));
+        match &expr {
+            ast::Expr::BinOp(n) => {
+                assert_eq!(n.node.kind, BinOpKind::Mod);
+                assert!(matches!(
+                    &*n.node.lhs,
+                    ast::Expr::Lit(lit) if matches!(lit.node, Lit::Int64Lit(7))
+                ));
+                assert!(matches!(
+                    &*n.node.rhs,
+                    ast::Expr::Lit(lit) if matches!(lit.node, Lit::Int64Lit(3))
+                ));
+            }
+            _ => panic!("expected BinOp"),
+        }
     }
 
     #[test]

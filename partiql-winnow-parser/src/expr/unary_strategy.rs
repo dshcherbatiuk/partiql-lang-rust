@@ -56,12 +56,30 @@ mod tests {
     #[test]
     fn test_unary_neg() {
         let expr = parse("-5");
-        assert!(matches!(&expr, ast::Expr::UniOp(n) if n.node.kind == UniOpKind::Neg));
+        match &expr {
+            ast::Expr::UniOp(n) => {
+                assert_eq!(n.node.kind, UniOpKind::Neg);
+                assert!(matches!(
+                    &*n.node.expr,
+                    ast::Expr::Lit(lit) if matches!(lit.node, ast::Lit::Int64Lit(5))
+                ));
+            }
+            _ => panic!("expected UniOp"),
+        }
     }
 
     #[test]
     fn test_unary_pos() {
         let expr = parse("+5");
-        assert!(matches!(&expr, ast::Expr::UniOp(n) if n.node.kind == UniOpKind::Pos));
+        match &expr {
+            ast::Expr::UniOp(n) => {
+                assert_eq!(n.node.kind, UniOpKind::Pos);
+                assert!(matches!(
+                    &*n.node.expr,
+                    ast::Expr::Lit(lit) if matches!(lit.node, ast::Lit::Int64Lit(5))
+                ));
+            }
+            _ => panic!("expected UniOp"),
+        }
     }
 }

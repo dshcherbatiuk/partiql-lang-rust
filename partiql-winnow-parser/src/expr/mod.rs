@@ -21,6 +21,7 @@
 
 pub mod add_sub_strategy;
 pub mod and_strategy;
+pub mod comparison;
 pub mod comparison_strategy;
 pub mod mul_div_strategy;
 pub mod not_strategy;
@@ -83,7 +84,7 @@ impl ExprChain {
                 Box::new(or_strategy::OrStrategy),
                 Box::new(and_strategy::AndStrategy),
                 Box::new(not_strategy::NotStrategy),
-                Box::new(comparison_strategy::ComparisonStrategy),
+                Box::new(comparison_strategy::ComparisonStrategy::new()),
                 Box::new(add_sub_strategy::AddSubStrategy),
                 Box::new(mul_div_strategy::MulDivStrategy),
                 Box::new(unary_strategy::UnaryStrategy),

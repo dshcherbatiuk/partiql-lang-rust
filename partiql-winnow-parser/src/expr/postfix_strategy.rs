@@ -58,6 +58,7 @@ impl ExprStrategy for PostfixStrategy {
 mod tests {
     use crate::expr::ExprChain;
     use partiql_ast::ast;
+    use partiql_ast::ast::{Lit, PathStep};
 
     fn parse(input: &str) -> ast::Expr {
         let chain = ExprChain::new();
@@ -70,7 +71,25 @@ mod tests {
     fn test_dot_access() {
         // a.b => Path with one step
         let expr = parse("a.b");
-        assert!(matches!(&expr, ast::Expr::Path(_)));
+        match &expr {
+            ast::Expr::Path(n) => {
+                assert!(matches!(
+                    &*n.node.root,
+                    ast::Expr::VarRef(v) if v.node.name.value == "a"
+                ));
+                assert_eq!(n.node.steps.len(), 1);
+                match &n.node.steps[0] {
+                    PathStep::PathProject(pe) => {
+                        assert!(matches!(
+                            &*pe.index,
+                            ast::Expr::Lit(lit) if matches!(&lit.node, Lit::CharStringLit(s) if s == "b")
+                        ));
+                    }
+                    _ => panic!("expected PathProject"),
+                }
+            }
+            _ => panic!("expected Path"),
+        }
     }
 
     #[test]
@@ -89,7 +108,17 @@ mod tests {
     fn test_bracket_access() {
         // a[0] => Path with one index step
         let expr = parse("a[0]");
-        assert!(matches!(&expr, ast::Expr::Path(_)));
+        match &expr {
+            ast::Expr::Path(n) => {
+                assert!(matches!(
+                    &*n.node.root,
+                    ast::Expr::VarRef(v) if v.node.name.value == "a"
+                ));
+                assert_eq!(n.node.steps.len(), 1);
+                assert!(matches!(&n.node.steps[0], PathStep::PathIndex(_)));
+            }
+            _ => panic!("expected Path"),
+        }
     }
 
     #[test]

@@ -17,11 +17,14 @@
 //! ```
 
 use partiql_ast::ast;
-use partiql_ast::ast::{CaseSensitivity, ScopeQualifier, SymbolPrimitive, VarRef};
+use partiql_ast::ast::{
+    Call, CallArg, CaseSensitivity, ScopeQualifier, SymbolPrimitive, VarRef,
+};
 use winnow::prelude::*;
 
 use super::{ExprStrategy, StrategyContext};
 use crate::identifier;
+use crate::keyword::ch;
 use crate::literal::boolean_strategy::BooleanLiteralStrategy;
 use crate::literal::null_strategy::NullMissingStrategy;
 use crate::literal::number_strategy::NumericLiteralStrategy;
@@ -73,8 +76,8 @@ impl ExprStrategy for PrimaryStrategy {
             return Ok(expr);
         }
 
-        // Identifier / variable reference (last — catches anything that looks like a name)
-        parse_identifier(input, ctx)
+        // Function call or identifier (last — catches anything that looks like a name)
+        parse_identifier_or_call(input, ctx)
     }
 
     fn name(&self) -> &str {
@@ -91,8 +94,67 @@ fn parse_paren_expr<'a>(input: &mut &'a str, ctx: &StrategyContext<'_>) -> PResu
     Ok(inner)
 }
 
-fn parse_identifier<'a>(input: &mut &'a str, ctx: &StrategyContext<'_>) -> PResult<ast::Expr> {
+/// Parse identifier — if followed by `(`, parse as function call.
+fn parse_identifier_or_call<'a>(
+    input: &mut &'a str,
+    ctx: &StrategyContext<'_>,
+) -> PResult<ast::Expr> {
     let name = identifier::identifier(input)?;
+    let _ = ws0(input);
+
+    // Function call: name(args...)
+    if ch('(').parse_next(input).is_ok() {
+        let _ = ws0(input);
+
+        let mut args = Vec::new();
+
+        // Empty args: name()
+        if ch(')').parse_next(input).is_ok() {
+            return Ok(ast::Expr::Call(ctx.node(Call {
+                func_name: SymbolPrimitive {
+                    value: name,
+                    case: CaseSensitivity::CaseInsensitive,
+                },
+                args,
+            })));
+        }
+
+        // Star arg: COUNT(*)
+        if ch('*').parse_next(input).is_ok() {
+            args.push(ctx.node(CallArg::Star()));
+            let _ = ws0(input);
+            ch(')').parse_next(input)?;
+            return Ok(ast::Expr::Call(ctx.node(Call {
+                func_name: SymbolPrimitive {
+                    value: name,
+                    case: CaseSensitivity::CaseInsensitive,
+                },
+                args,
+            })));
+        }
+
+        // Positional args: name(expr, expr, ...)
+        loop {
+            let _ = ws0(input);
+            let expr = ctx.parse_expr(input)?;
+            args.push(ctx.node(CallArg::Positional(Box::new(expr))));
+            let _ = ws0(input);
+            if ch(',').parse_next(input).is_err() {
+                break;
+            }
+        }
+        let _ = ws0(input);
+        ch(')').parse_next(input)?;
+
+        return Ok(ast::Expr::Call(ctx.node(Call {
+            func_name: SymbolPrimitive {
+                value: name,
+                case: CaseSensitivity::CaseInsensitive,
+            },
+            args,
+        })));
+    }
+
     Ok(ast::Expr::VarRef(ctx.node(VarRef {
         name: SymbolPrimitive {
             value: name,
@@ -104,7 +166,7 @@ fn parse_identifier<'a>(input: &mut &'a str, ctx: &StrategyContext<'_>) -> PResu
 
 #[cfg(test)]
 mod tests {
-    use partiql_ast::ast::Lit;
+    use partiql_ast::ast::{CallArg, Lit};
 
     use crate::expr::ExprChain;
 
@@ -210,61 +272,85 @@ mod tests {
     #[test]
     fn test_addition() {
         let e = parse("1 + 2");
-        assert!(matches!(e, ast::Expr::BinOp(_)));
+        assert!(matches!(
+            &e,
+            ast::Expr::BinOp(n) if n.node.kind == ast::BinOpKind::Add
+        ));
     }
 
     #[test]
     fn test_subtraction() {
         let e = parse("5 - 3");
-        assert!(matches!(e, ast::Expr::BinOp(_)));
+        assert!(matches!(
+            &e,
+            ast::Expr::BinOp(n) if n.node.kind == ast::BinOpKind::Sub
+        ));
     }
 
     #[test]
     fn test_multiplication() {
         let e = parse("2 * 3");
-        assert!(matches!(e, ast::Expr::BinOp(_)));
+        assert!(matches!(
+            &e,
+            ast::Expr::BinOp(n) if n.node.kind == ast::BinOpKind::Mul
+        ));
     }
 
     #[test]
     fn test_comparison_eq() {
         let e = parse("a = 1");
-        assert!(matches!(e, ast::Expr::BinOp(_)));
+        assert!(matches!(
+            &e,
+            ast::Expr::BinOp(n) if n.node.kind == ast::BinOpKind::Eq
+        ));
     }
 
     #[test]
     fn test_comparison_neq() {
         let e = parse("a != 1");
-        assert!(matches!(e, ast::Expr::BinOp(_)));
+        assert!(matches!(
+            &e,
+            ast::Expr::BinOp(n) if n.node.kind == ast::BinOpKind::Ne
+        ));
     }
 
     #[test]
     fn test_and() {
         let e = parse("a = 1 AND b = 2");
-        assert!(matches!(e, ast::Expr::BinOp(_)));
+        assert!(matches!(
+            &e,
+            ast::Expr::BinOp(n) if n.node.kind == ast::BinOpKind::And
+        ));
     }
 
     #[test]
     fn test_or() {
         let e = parse("a = 1 OR b = 2");
-        assert!(matches!(e, ast::Expr::BinOp(_)));
+        assert!(matches!(
+            &e,
+            ast::Expr::BinOp(n) if n.node.kind == ast::BinOpKind::Or
+        ));
     }
 
     #[test]
     fn test_not() {
         let e = parse("NOT true");
-        assert!(matches!(e, ast::Expr::UniOp(_)));
+        assert!(matches!(
+            &e,
+            ast::Expr::UniOp(n) if n.node.kind == ast::UniOpKind::Not
+        ));
     }
 
     #[test]
     fn test_path_dot() {
         let e = parse("a.b");
-        assert!(matches!(e, ast::Expr::Path(_)));
+        assert!(matches!(&e, ast::Expr::Path(_)));
     }
 
     #[test]
     fn test_path_bracket() {
         let e = parse("a[0]");
-        assert!(matches!(e, ast::Expr::Path(_)));
+        assert!(matches!(&e, ast::Expr::Path(_)));
     }
 
     #[test]
@@ -305,5 +391,58 @@ mod tests {
         // Real FDE query pattern
         let e = parse("u.email = 'test@co.com' AND p.originalPlatformId = 'GChat'");
         assert!(matches!(e, ast::Expr::BinOp(_)));
+    }
+
+    // ── Function call tests ──────────────
+
+    #[test]
+    fn test_call_no_args() {
+        let e = parse("NOW()");
+        assert!(matches!(&e, ast::Expr::Call(_)));
+        if let ast::Expr::Call(n) = &e {
+            assert_eq!(n.node.func_name.value, "NOW");
+            assert!(n.node.args.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_call_star() {
+        let e = parse("COUNT(*)");
+        assert!(matches!(&e, ast::Expr::Call(_)));
+        if let ast::Expr::Call(n) = &e {
+            assert_eq!(n.node.func_name.value, "COUNT");
+            assert_eq!(n.node.args.len(), 1);
+            assert!(matches!(n.node.args[0].node, CallArg::Star()));
+        }
+    }
+
+    #[test]
+    fn test_call_single_arg() {
+        let e = parse("UPPER('hello')");
+        assert!(matches!(&e, ast::Expr::Call(_)));
+        if let ast::Expr::Call(n) = &e {
+            assert_eq!(n.node.func_name.value, "UPPER");
+            assert_eq!(n.node.args.len(), 1);
+        }
+    }
+
+    #[test]
+    fn test_call_multiple_args() {
+        let e = parse("SUBSTRING(name, 1, 3)");
+        assert!(matches!(&e, ast::Expr::Call(_)));
+        if let ast::Expr::Call(n) = &e {
+            assert_eq!(n.node.func_name.value, "SUBSTRING");
+            assert_eq!(n.node.args.len(), 3);
+        }
+    }
+
+    #[test]
+    fn test_call_nested() {
+        let e = parse("UPPER(TRIM(name))");
+        assert!(matches!(&e, ast::Expr::Call(_)));
+        if let ast::Expr::Call(n) = &e {
+            assert_eq!(n.node.func_name.value, "UPPER");
+            assert_eq!(n.node.args.len(), 1);
+        }
     }
 }

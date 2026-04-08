@@ -49,7 +49,20 @@ mod tests {
     #[test]
     fn test_simple_or() {
         let expr = parse("1 OR 2");
-        assert!(matches!(&expr, ast::Expr::BinOp(n) if n.node.kind == BinOpKind::Or));
+        match &expr {
+            ast::Expr::BinOp(n) => {
+                assert_eq!(n.node.kind, BinOpKind::Or);
+                assert!(matches!(
+                    &*n.node.lhs,
+                    ast::Expr::Lit(lit) if matches!(lit.node, ast::Lit::Int64Lit(1))
+                ));
+                assert!(matches!(
+                    &*n.node.rhs,
+                    ast::Expr::Lit(lit) if matches!(lit.node, ast::Lit::Int64Lit(2))
+                ));
+            }
+            _ => panic!("expected BinOp"),
+        }
     }
 
     #[test]

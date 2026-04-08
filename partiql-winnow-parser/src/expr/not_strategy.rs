@@ -48,7 +48,16 @@ mod tests {
     #[test]
     fn test_not() {
         let expr = parse("NOT true");
-        assert!(matches!(&expr, ast::Expr::UniOp(n) if n.node.kind == UniOpKind::Not));
+        match &expr {
+            ast::Expr::UniOp(n) => {
+                assert_eq!(n.node.kind, UniOpKind::Not);
+                assert!(matches!(
+                    &*n.node.expr,
+                    ast::Expr::Lit(lit) if matches!(lit.node, ast::Lit::BoolLit(true))
+                ));
+            }
+            _ => panic!("expected UniOp"),
+        }
     }
 
     #[test]

@@ -32,6 +32,7 @@ impl<'p> FromClauseParser<'p> {
         let expr = self.chain.parse_expr(input, pctx)?;
         let _ = ws0(input);
 
+        // AS alias — explicit or implicit (AS keyword is optional per PartiQL spec)
         let as_alias = if (kw("AS"), ws).parse_next(input).is_ok() {
             let alias = identifier::identifier(input)?;
             Some(SymbolPrimitive {
@@ -39,7 +40,7 @@ impl<'p> FromClauseParser<'p> {
                 case: CaseSensitivity::CaseInsensitive,
             })
         } else {
-            None
+            try_implicit_alias(input)
         };
 
         let _ = ws0(input);
@@ -60,6 +61,32 @@ impl<'p> FromClauseParser<'p> {
             at_alias,
             by_alias: None,
         })))
+    }
+}
+
+/// Reserved keywords that cannot be implicit aliases.
+/// If the next token is one of these, it's a clause keyword, not an alias.
+const CLAUSE_KEYWORDS: &[&str] = &[
+    "WHERE", "GROUP", "HAVING", "ORDER", "LIMIT", "OFFSET", "JOIN", "INNER", "LEFT", "RIGHT",
+    "FULL", "CROSS", "ON", "SET", "AT", "UNION", "INTERSECT", "EXCEPT",
+];
+
+/// Try to parse an implicit alias — an identifier that is not a reserved clause keyword.
+fn try_implicit_alias(input: &mut &str) -> Option<SymbolPrimitive> {
+    let checkpoint = *input;
+    if let Ok(name) = identifier::identifier(input) {
+        let upper = name.to_uppercase();
+        if CLAUSE_KEYWORDS.iter().any(|kw| *kw == upper) {
+            *input = checkpoint;
+            None
+        } else {
+            Some(SymbolPrimitive {
+                value: name,
+                case: CaseSensitivity::CaseInsensitive,
+            })
+        }
+    } else {
+        None
     }
 }
 
@@ -131,6 +158,39 @@ mod tests {
                 assert_eq!(from_let.node.as_alias.as_ref().unwrap().value, "u");
                 assert!(from_let.node.at_alias.is_some());
                 assert_eq!(from_let.node.at_alias.as_ref().unwrap().value, "idx");
+            }
+            other => panic!("expected FromLet, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_implicit_alias() {
+        let (parser, pctx) = setup();
+        let mut input = "users u WHERE";
+        let result = FromClauseParser::new(parser.chain())
+            .parse(&mut input, &pctx)
+            .expect("parse failed");
+        match &result.node.source {
+            FromSource::FromLet(from_let) => {
+                assert!(from_let.node.as_alias.is_some());
+                assert_eq!(from_let.node.as_alias.as_ref().unwrap().value, "u");
+            }
+            other => panic!("expected FromLet, got {:?}", other),
+        }
+        assert_eq!(input.trim(), "WHERE");
+    }
+
+    #[test]
+    fn test_implicit_alias_not_keyword() {
+        // WHERE should NOT be consumed as an implicit alias
+        let (parser, pctx) = setup();
+        let mut input = "users WHERE";
+        let result = FromClauseParser::new(parser.chain())
+            .parse(&mut input, &pctx)
+            .expect("parse failed");
+        match &result.node.source {
+            FromSource::FromLet(from_let) => {
+                assert!(from_let.node.as_alias.is_none());
             }
             other => panic!("expected FromLet, got {:?}", other),
         }

@@ -10,6 +10,10 @@ use crate::parse_context::ParseContext;
 use crate::whitespace::{ws, ws0};
 
 use super::from_clause::FromClauseParser;
+use super::group_by_clause::GroupByClauseParser;
+use super::having_clause::HavingClauseParser;
+use super::limit_offset_clause::LimitOffsetClauseParser;
+use super::order_by_clause::OrderByClauseParser;
 use super::projection_clause::ProjectionClause;
 use super::where_clause::WhereClauseParser;
 use super::ClauseParser;
@@ -37,25 +41,58 @@ impl SelectParser {
         let projection_clause = ProjectionClause::new(&self.chain);
         let from_clause = FromClauseParser::new(&self.chain);
         let where_clause = WhereClauseParser::new(&self.chain);
+        let group_by_clause = GroupByClauseParser::new(&self.chain);
+        let having_clause = HavingClauseParser::new(&self.chain);
+        let order_by_clause = OrderByClauseParser::new(&self.chain);
+        let limit_offset_clause = LimitOffsetClauseParser::new(&self.chain);
 
         let _ = ws0(input);
         let _ = (kw("SELECT"), ws).parse_next(input)?;
 
         let projection = projection_clause.parse(input, pctx)?;
 
-        let from = if (ws0, kw("FROM"), ws).parse_next(input).is_ok() {
-            Some(from_clause.parse(input, pctx)?)
-        } else {
-            None
+        let from = {
+            let checkpoint = *input;
+            if (ws0, kw("FROM"), ws).parse_next(input).is_ok() {
+                Some(from_clause.parse(input, pctx)?)
+            } else {
+                *input = checkpoint;
+                None
+            }
         };
 
-        let where_ = if (ws0, kw("WHERE"), ws).parse_next(input).is_ok() {
-            Some(where_clause.parse(input, pctx)?)
-        } else {
-            None
+        let where_ = {
+            let checkpoint = *input;
+            if (ws0, kw("WHERE"), ws).parse_next(input).is_ok() {
+                Some(where_clause.parse(input, pctx)?)
+            } else {
+                *input = checkpoint;
+                None
+            }
         };
 
-        // TODO: GROUP BY, HAVING, ORDER BY, LIMIT, OFFSET
+        let group_by = {
+            let checkpoint = *input;
+            if (ws0, kw("GROUP"), ws, kw("BY"), ws)
+                .parse_next(input)
+                .is_ok()
+            {
+                Some(group_by_clause.parse(input, pctx)?)
+            } else {
+                *input = checkpoint;
+                None
+            }
+        };
+
+        let having = {
+            let checkpoint = *input;
+            if (ws0, kw("HAVING"), ws).parse_next(input).is_ok() {
+                Some(having_clause.parse(input, pctx)?)
+            } else {
+                *input = checkpoint;
+                None
+            }
+        };
 
         let select = Select {
             project: pctx.node(projection),
@@ -63,14 +100,39 @@ impl SelectParser {
             from,
             from_let: None,
             where_clause: where_,
-            group_by: None,
-            having: None,
+            group_by,
+            having,
+        };
+
+        let order_by = {
+            let checkpoint = *input;
+            if (ws0, kw("ORDER"), ws, kw("BY"), ws)
+                .parse_next(input)
+                .is_ok()
+            {
+                Some(order_by_clause.parse(input, pctx)?)
+            } else {
+                *input = checkpoint;
+                None
+            }
+        };
+
+        let limit_offset = {
+            let checkpoint = *input;
+            match limit_offset_clause.parse(input, pctx) {
+                Ok(lo) => Some(lo),
+                Err(winnow::error::ErrMode::Backtrack(_)) => {
+                    *input = checkpoint;
+                    None
+                }
+                Err(e) => return Err(e),
+            }
         };
 
         let query = Query {
             set: pctx.node(QuerySet::Select(Box::new(pctx.node(select)))),
-            order_by: None,
-            limit_offset: None,
+            order_by,
+            limit_offset,
         };
 
         Ok(ast::Expr::Query(pctx.node(query)))
@@ -86,6 +148,9 @@ impl Default for SelectParser {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use partiql_ast::ast::{
+        BinOpKind, CallArg, OrderingSpec, ProjectionKind, QuerySet, SetQuantifier,
+    };
 
     fn parse(input: &str) -> ast::Expr {
         let parser = SelectParser::new();
@@ -94,61 +159,307 @@ mod tests {
         parser.parse(&mut i, &pctx).expect("parse failed")
     }
 
+    /// Extract (Query, Select) from parsed Expr for deep assertions.
+    fn extract_query_select(expr: &ast::Expr) -> (&Query, &Select) {
+        match expr {
+            ast::Expr::Query(q) => match &q.node.set.node {
+                QuerySet::Select(s) => (&q.node, &s.node),
+                other => panic!("expected QuerySet::Select, got {:?}", other),
+            },
+            other => panic!("expected Expr::Query, got {:?}", other),
+        }
+    }
+
     #[test]
     fn test_select_star() {
-        assert!(matches!(parse("SELECT * FROM t"), ast::Expr::Query(_)));
+        let expr = parse("SELECT * FROM t");
+        let (_, select) = extract_query_select(&expr);
+        assert!(matches!(
+            select.project.node.kind,
+            ProjectionKind::ProjectStar
+        ));
+        assert!(select.from.is_some());
     }
 
     #[test]
     fn test_select_field() {
-        assert!(matches!(parse("SELECT a FROM t"), ast::Expr::Query(_)));
+        let expr = parse("SELECT a FROM t");
+        let (_, select) = extract_query_select(&expr);
+        match &select.project.node.kind {
+            ProjectionKind::ProjectList(items) => assert_eq!(items.len(), 1),
+            other => panic!("expected ProjectList, got {:?}", other),
+        }
     }
 
     #[test]
     fn test_select_multiple_fields() {
-        assert!(matches!(
-            parse("SELECT a, b, c FROM t"),
-            ast::Expr::Query(_)
-        ));
+        let expr = parse("SELECT a, b, c FROM t");
+        let (_, select) = extract_query_select(&expr);
+        match &select.project.node.kind {
+            ProjectionKind::ProjectList(items) => assert_eq!(items.len(), 3),
+            other => panic!("expected ProjectList, got {:?}", other),
+        }
     }
 
     #[test]
     fn test_select_with_where() {
-        assert!(matches!(
-            parse("SELECT a FROM t WHERE x = 1"),
-            ast::Expr::Query(_)
-        ));
+        let expr = parse("SELECT a FROM t WHERE x = 1");
+        let (_, select) = extract_query_select(&expr);
+        assert!(select.from.is_some());
+        let where_clause = select.where_clause.as_ref().expect("missing WHERE");
+        assert!(matches!(&*where_clause.node.expr, ast::Expr::BinOp(_)));
     }
 
     #[test]
     fn test_select_with_alias() {
-        assert!(matches!(
-            parse("SELECT a FROM t AS u WHERE u.x = 1"),
-            ast::Expr::Query(_)
-        ));
+        let expr = parse("SELECT a FROM t AS u WHERE u.x = 1");
+        let (_, select) = extract_query_select(&expr);
+        assert!(select.from.is_some());
+        assert!(select.where_clause.is_some());
     }
 
     #[test]
     fn test_select_value() {
+        let expr = parse("SELECT VALUE x FROM t");
+        let (_, select) = extract_query_select(&expr);
         assert!(matches!(
-            parse("SELECT VALUE x FROM t"),
-            ast::Expr::Query(_)
+            select.project.node.kind,
+            ProjectionKind::ProjectValue(_)
         ));
     }
 
     #[test]
     fn test_select_distinct() {
-        assert!(matches!(
-            parse("SELECT DISTINCT a FROM t"),
-            ast::Expr::Query(_)
-        ));
+        let expr = parse("SELECT DISTINCT a FROM t");
+        let (_, select) = extract_query_select(&expr);
+        assert_eq!(
+            select.project.node.setq,
+            Some(SetQuantifier::Distinct)
+        );
     }
 
     #[test]
     fn test_select_complex_where() {
-        assert!(matches!(
-            parse("SELECT u.email FROM users u WHERE u.email = 'test@co.com' AND u.active = true"),
-            ast::Expr::Query(_)
-        ));
+        let expr = parse(
+            "SELECT u.email FROM users u WHERE u.email = 'test@co.com' AND u.active = true",
+        );
+        let (_, select) = extract_query_select(&expr);
+        let where_clause = select.where_clause.as_ref().expect("missing WHERE");
+        match &*where_clause.node.expr {
+            ast::Expr::BinOp(n) => assert_eq!(n.node.kind, BinOpKind::And),
+            other => panic!("expected BinOp(And), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_select_where_is_null() {
+        let expr = parse("SELECT a FROM t WHERE x IS NULL");
+        let (_, select) = extract_query_select(&expr);
+        let where_clause = select.where_clause.as_ref().expect("missing WHERE");
+        match &*where_clause.node.expr {
+            ast::Expr::BinOp(n) => assert_eq!(n.node.kind, BinOpKind::Is),
+            other => panic!("expected BinOp(Is), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_select_where_is_not_null() {
+        let expr = parse("SELECT a FROM t WHERE x IS NOT NULL");
+        let (_, select) = extract_query_select(&expr);
+        let where_clause = select.where_clause.as_ref().expect("missing WHERE");
+        assert!(matches!(&*where_clause.node.expr, ast::Expr::UniOp(_)));
+    }
+
+    #[test]
+    fn test_select_where_in() {
+        let expr = parse("SELECT a FROM t WHERE x IN (1, 2, 3)");
+        let (_, select) = extract_query_select(&expr);
+        let where_clause = select.where_clause.as_ref().expect("missing WHERE");
+        assert!(matches!(&*where_clause.node.expr, ast::Expr::In(_)));
+    }
+
+    #[test]
+    fn test_select_where_not_in() {
+        let expr = parse("SELECT a FROM t WHERE x NOT IN ('a', 'b')");
+        let (_, select) = extract_query_select(&expr);
+        let where_clause = select.where_clause.as_ref().expect("missing WHERE");
+        match &*where_clause.node.expr {
+            ast::Expr::UniOp(n) => assert!(matches!(&*n.node.expr, ast::Expr::In(_))),
+            other => panic!("expected UniOp(Not, In), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_select_where_like() {
+        let expr = parse("SELECT a FROM t WHERE name LIKE '%foo%'");
+        let (_, select) = extract_query_select(&expr);
+        let where_clause = select.where_clause.as_ref().expect("missing WHERE");
+        assert!(matches!(&*where_clause.node.expr, ast::Expr::Like(_)));
+    }
+
+    #[test]
+    fn test_select_where_between() {
+        let expr = parse("SELECT a FROM t WHERE age BETWEEN 18 AND 65");
+        let (_, select) = extract_query_select(&expr);
+        let where_clause = select.where_clause.as_ref().expect("missing WHERE");
+        assert!(matches!(&*where_clause.node.expr, ast::Expr::Between(_)));
+    }
+
+    #[test]
+    fn test_select_count_star() {
+        let expr = parse("SELECT COUNT(*) FROM t");
+        let (_, select) = extract_query_select(&expr);
+        match &select.project.node.kind {
+            ProjectionKind::ProjectList(items) => {
+                assert_eq!(items.len(), 1);
+                match &items[0].node {
+                    ast::ProjectItem::ProjectExpr(pe) => match &*pe.expr {
+                        ast::Expr::Call(c) => {
+                            assert_eq!(c.node.func_name.value, "COUNT");
+                            assert_eq!(c.node.args.len(), 1);
+                            assert!(matches!(c.node.args[0].node, CallArg::Star()));
+                        }
+                        other => panic!("expected Call, got {:?}", other),
+                    },
+                    other => panic!("expected ProjectExpr, got {:?}", other),
+                }
+            }
+            other => panic!("expected ProjectList, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_select_function_call() {
+        let expr = parse("SELECT UPPER(name) FROM t WHERE LENGTH(name) > 3");
+        let (_, select) = extract_query_select(&expr);
+        // Projection has UPPER(name)
+        match &select.project.node.kind {
+            ProjectionKind::ProjectList(items) => {
+                assert_eq!(items.len(), 1);
+                match &items[0].node {
+                    ast::ProjectItem::ProjectExpr(pe) => {
+                        assert!(matches!(&*pe.expr, ast::Expr::Call(_)));
+                    }
+                    other => panic!("expected ProjectExpr, got {:?}", other),
+                }
+            }
+            other => panic!("expected ProjectList, got {:?}", other),
+        }
+        // WHERE has LENGTH(name) > 3
+        let where_clause = select.where_clause.as_ref().expect("missing WHERE");
+        match &*where_clause.node.expr {
+            ast::Expr::BinOp(n) => {
+                assert_eq!(n.node.kind, BinOpKind::Gt);
+                assert!(matches!(&*n.node.lhs, ast::Expr::Call(_)));
+            }
+            other => panic!("expected BinOp(Gt), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_select_group_by() {
+        let expr = parse("SELECT category, COUNT(*) FROM items GROUP BY category");
+        let (_, select) = extract_query_select(&expr);
+        let group_by = select.group_by.as_ref().expect("missing GROUP BY");
+        assert_eq!(group_by.node.keys.len(), 1);
+        assert!(group_by.node.strategy.is_none());
+    }
+
+    #[test]
+    fn test_select_group_by_having() {
+        let expr = parse(
+            "SELECT category, COUNT(*) FROM items GROUP BY category HAVING COUNT(*) > 5",
+        );
+        let (_, select) = extract_query_select(&expr);
+        assert!(select.group_by.is_some());
+        let having = select.having.as_ref().expect("missing HAVING");
+        match &*having.node.expr {
+            ast::Expr::BinOp(n) => assert_eq!(n.node.kind, BinOpKind::Gt),
+            other => panic!("expected BinOp(Gt), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_select_order_by() {
+        let expr = parse("SELECT a FROM t ORDER BY a ASC");
+        let (query, _) = extract_query_select(&expr);
+        let order_by = query.order_by.as_ref().expect("missing ORDER BY");
+        assert_eq!(order_by.node.sort_specs.len(), 1);
+        assert_eq!(
+            order_by.node.sort_specs[0].node.ordering_spec,
+            Some(OrderingSpec::Asc)
+        );
+    }
+
+    #[test]
+    fn test_select_order_by_multiple() {
+        let expr = parse("SELECT a, b FROM t ORDER BY a ASC, b DESC");
+        let (query, _) = extract_query_select(&expr);
+        let order_by = query.order_by.as_ref().expect("missing ORDER BY");
+        assert_eq!(order_by.node.sort_specs.len(), 2);
+        assert_eq!(
+            order_by.node.sort_specs[0].node.ordering_spec,
+            Some(OrderingSpec::Asc)
+        );
+        assert_eq!(
+            order_by.node.sort_specs[1].node.ordering_spec,
+            Some(OrderingSpec::Desc)
+        );
+    }
+
+    #[test]
+    fn test_select_limit() {
+        let expr = parse("SELECT a FROM t LIMIT 10");
+        let (query, _) = extract_query_select(&expr);
+        let lo = query.limit_offset.as_ref().expect("missing LIMIT");
+        assert!(lo.node.limit.is_some());
+        assert!(lo.node.offset.is_none());
+    }
+
+    #[test]
+    fn test_select_limit_offset() {
+        let expr = parse("SELECT a FROM t LIMIT 10 OFFSET 5");
+        let (query, _) = extract_query_select(&expr);
+        let lo = query.limit_offset.as_ref().expect("missing LIMIT/OFFSET");
+        assert!(lo.node.limit.is_some());
+        assert!(lo.node.offset.is_some());
+    }
+
+    #[test]
+    fn test_select_full_query() {
+        let expr = parse(
+            "SELECT category, COUNT(*) FROM items WHERE active = true GROUP BY category HAVING COUNT(*) > 1 ORDER BY category ASC LIMIT 10 OFFSET 0",
+        );
+        let (query, select) = extract_query_select(&expr);
+
+        // Projection: 2 items
+        match &select.project.node.kind {
+            ProjectionKind::ProjectList(items) => assert_eq!(items.len(), 2),
+            other => panic!("expected ProjectList, got {:?}", other),
+        }
+
+        assert!(select.from.is_some());
+        assert!(select.where_clause.is_some());
+
+        // GROUP BY: 1 key
+        let group_by = select.group_by.as_ref().expect("missing GROUP BY");
+        assert_eq!(group_by.node.keys.len(), 1);
+
+        // HAVING: COUNT(*) > 1
+        let having = select.having.as_ref().expect("missing HAVING");
+        assert!(matches!(&*having.node.expr, ast::Expr::BinOp(_)));
+
+        // ORDER BY: 1 spec, ASC
+        let order_by = query.order_by.as_ref().expect("missing ORDER BY");
+        assert_eq!(order_by.node.sort_specs.len(), 1);
+        assert_eq!(
+            order_by.node.sort_specs[0].node.ordering_spec,
+            Some(OrderingSpec::Asc)
+        );
+
+        // LIMIT 10 OFFSET 0
+        let lo = query.limit_offset.as_ref().expect("missing LIMIT/OFFSET");
+        assert!(lo.node.limit.is_some());
+        assert!(lo.node.offset.is_some());
     }
 }

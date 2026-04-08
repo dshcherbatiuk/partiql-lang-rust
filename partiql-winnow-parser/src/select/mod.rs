@@ -10,8 +10,10 @@
 //! │  ProjectionClause                        │
 //! │  FromClauseParser                        │
 //! │  WhereClauseParser                       │
-//! │  // TODO: GroupByClause, HavingClause,   │
-//! │  //       OrderByClause, LimitOffset     │
+//! │  GroupByClauseParser                     │
+//! │  HavingClauseParser                      │
+//! │  OrderByClauseParser                     │
+//! │  LimitOffsetClauseParser                 │
 //! │                                          │
 //! │ ParseContext (per-parse mutable state)    │
 //! │  — only argument to parse()              │
@@ -19,6 +21,10 @@
 //! ```
 
 pub mod from_clause;
+pub mod group_by_clause;
+pub mod having_clause;
+pub mod limit_offset_clause;
+pub mod order_by_clause;
 pub mod projection_clause;
 mod select_parser;
 pub mod where_clause;
