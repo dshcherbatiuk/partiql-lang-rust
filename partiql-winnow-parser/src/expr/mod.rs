@@ -27,6 +27,7 @@ pub mod mul_div_strategy;
 pub mod not_strategy;
 pub mod or_strategy;
 pub mod postfix_strategy;
+pub mod pratt;
 pub mod primary_strategy;
 pub mod unary_strategy;
 
@@ -41,22 +42,27 @@ use crate::parse_context::ParseContext;
 /// Stack-allocated reference. Strategies use this to delegate to
 /// next levels and create AST nodes.
 pub struct StrategyContext<'c> {
-    chain: &'c ExprChain,
-    level: usize,
+    pratt: &'c pratt::PrattParser,
     pub(crate) parse_ctx: &'c ParseContext,
 }
 
 impl<'c> StrategyContext<'c> {
-    /// Parse a sub-expression at the next (higher-precedence) level.
-    #[inline]
-    pub fn parse_next_level<'a>(&self, input: &mut &'a str) -> PResult<ast::Expr> {
-        self.chain.parse_at(input, self.level + 1, self.parse_ctx)
+    pub fn new(pratt: &'c pratt::PrattParser, parse_ctx: &'c ParseContext) -> Self {
+        Self { pratt, parse_ctx }
     }
 
-    /// Parse a full expression from the lowest precedence level.
+    /// Parse a sub-expression at "next level" — in Pratt terms, parse with
+    /// min_bp high enough to stop before AND/OR (used by BETWEEN, comparison RHS).
+    #[inline]
+    pub fn parse_next_level<'a>(&self, input: &mut &'a str) -> PResult<ast::Expr> {
+        // bp=5 stops before AND(3) and OR(1), but allows arithmetic(7+) and comparison(5+)
+        self.pratt.parse_bp(input, self.parse_ctx, 5)
+    }
+
+    /// Parse a full expression (delegates to Pratt parser).
     #[inline]
     pub fn parse_expr<'a>(&self, input: &mut &'a str) -> PResult<ast::Expr> {
-        self.chain.parse_expr(input, self.parse_ctx)
+        self.pratt.parse_expr(input, self.parse_ctx)
     }
 
     /// Create an AST node with a fresh ID.
@@ -72,50 +78,33 @@ pub trait ExprStrategy {
     fn name(&self) -> &str;
 }
 
-/// Chain of expression strategies — stateless, created once, reused.
+/// Expression parser — delegates to PrattParser.
+/// Keeps the `ExprChain` name for API compatibility with clause/join/DML parsers.
 pub struct ExprChain {
-    strategies: Vec<Box<dyn ExprStrategy>>,
+    pratt: pratt::PrattParser,
 }
 
 impl ExprChain {
     pub fn new() -> Self {
         Self {
-            strategies: vec![
-                Box::new(or_strategy::OrStrategy),
-                Box::new(and_strategy::AndStrategy),
-                Box::new(not_strategy::NotStrategy),
-                Box::new(comparison_strategy::ComparisonStrategy::new()),
-                Box::new(add_sub_strategy::AddSubStrategy),
-                Box::new(mul_div_strategy::MulDivStrategy),
-                Box::new(unary_strategy::UnaryStrategy),
-                Box::new(postfix_strategy::PostfixStrategy),
-                Box::new(primary_strategy::PrimaryStrategy::new()),
-            ],
+            pratt: pratt::PrattParser::new(),
         }
     }
 
-    /// Parse at the given precedence level.
-    pub fn parse_at<'a>(
-        &self,
-        input: &mut &'a str,
-        level: usize,
-        parse_ctx: &ParseContext,
-    ) -> PResult<ast::Expr> {
-        let ctx = StrategyContext {
-            chain: self,
-            level,
-            parse_ctx,
-        };
-        self.strategies[level].parse(input, &ctx)
-    }
-
-    /// Parse a full expression at the lowest precedence.
+    /// Parse a full expression.
+    #[inline]
     pub fn parse_expr<'a>(
         &self,
         input: &mut &'a str,
         parse_ctx: &ParseContext,
     ) -> PResult<ast::Expr> {
-        self.parse_at(input, 0, parse_ctx)
+        self.pratt.parse_expr(input, parse_ctx)
+    }
+
+    /// Access the underlying Pratt parser.
+    #[inline]
+    pub fn pratt(&self) -> &pratt::PrattParser {
+        &self.pratt
     }
 }
 

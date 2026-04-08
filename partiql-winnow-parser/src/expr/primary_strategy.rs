@@ -63,8 +63,10 @@ impl Default for PrimaryStrategy {
     }
 }
 
-impl ExprStrategy for PrimaryStrategy {
-    fn parse<'a>(&self, input: &mut &'a str, ctx: &StrategyContext<'_>) -> PResult<ast::Expr> {
+impl PrimaryStrategy {
+    /// Parse a primary expression — called by PrattParser directly.
+    #[inline]
+    pub fn parse_primary<'a>(&self, input: &mut &'a str, ctx: &StrategyContext<'_>) -> PResult<ast::Expr> {
         let _ = ws0(input);
 
         // First-char dispatch — avoids iterating 8 strategies for common cases
@@ -130,6 +132,13 @@ impl ExprStrategy for PrimaryStrategy {
 
         // Function call or identifier (catches anything that looks like a name)
         parse_identifier_or_call(input, ctx)
+    }
+
+}
+
+impl ExprStrategy for PrimaryStrategy {
+    fn parse<'a>(&self, input: &mut &'a str, ctx: &StrategyContext<'_>) -> PResult<ast::Expr> {
+        self.parse_primary(input, ctx)
     }
 
     fn name(&self) -> &str {
