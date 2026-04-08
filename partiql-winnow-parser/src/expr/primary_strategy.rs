@@ -22,7 +22,7 @@ use partiql_ast::ast::{
 };
 use winnow::prelude::*;
 
-use super::{ExprStrategy, StrategyContext};
+use super::StrategyContext;
 use crate::identifier;
 use crate::keyword::ch;
 use crate::literal::bag_strategy::BagConstructorStrategy;
@@ -134,12 +134,6 @@ impl PrimaryStrategy {
         parse_identifier_or_call(input, ctx)
     }
 
-}
-
-impl ExprStrategy for PrimaryStrategy {
-    fn parse<'a>(&self, input: &mut &'a str, ctx: &StrategyContext<'_>) -> PResult<ast::Expr> {
-        self.parse_primary(input, ctx)
-    }
 }
 
 fn parse_paren_expr<'a>(input: &mut &'a str, ctx: &StrategyContext<'_>) -> PResult<ast::Expr> {

@@ -1,46 +1,33 @@
-//! Expression parsing — Strategy + Chain of Responsibility pattern.
+//! Expression parsing — Pratt parser with binding power.
 //!
-//! Each precedence level is a strategy. The chain delegates down from
-//! lowest to highest precedence. Produces `partiql_ast::ast::Expr` directly.
+//! Single-loop expression engine replacing the 9-level recursive chain.
+//! For a literal `1`: 1 call. For `a = 1 AND b = 2`: ~7 calls.
 //!
 //! ```text
 //! ┌───────────────────────────────────────────────────────┐
-//! │ ExprChain (stateless — created once, reused)         │
+//! │ PrattParser (single loop, binding power table)        │
 //! │                                                       │
-//! │  [0] OrStrategy          ← entry point (lowest prec) │
-//! │  [1] AndStrategy                                      │
-//! │  [2] NotStrategy                                      │
-//! │  [3] ComparisonStrategy  (= != < > IS IN LIKE)        │
-//! │  [4] AddSubStrategy      (+ - ||)                     │
-//! │  [5] MulDivStrategy      (* / %)                      │
-//! │  [6] UnaryStrategy       (- + NOT)                    │
-//! │  [7] PostfixStrategy     (. [] ())                    │
-//! │  [8] PrimaryStrategy     (lit ident parens fn)        │
+//! │  Prefix:  NOT, -, +, literals, identifiers, parens   │
+//! │  Infix:   OR, AND, =, !=, <, >, +, -, *, /, ||      │
+//! │  Special: IS, IN, LIKE, BETWEEN, NOT IN/LIKE/BETWEEN │
+//! │  Postfix: . [] (path access)                         │
+//! │                                                       │
+//! │  PrimaryStrategy: literals, identifiers, functions   │
+//! │  ComparisonParsers: IS, IN, LIKE, BETWEEN            │
 //! └───────────────────────────────────────────────────────┘
 //! ```
 
-pub mod add_sub_strategy;
-pub mod and_strategy;
 pub mod comparison;
-pub mod comparison_strategy;
-pub mod mul_div_strategy;
-pub mod not_strategy;
-pub mod or_strategy;
-pub mod postfix_strategy;
 pub mod pratt;
 pub mod primary_strategy;
-pub mod unary_strategy;
 
 use partiql_ast::ast;
 use winnow::prelude::*;
 
 use crate::parse_context::ParseContext;
 
-/// Context passed to each strategy — provides access to the chain,
-/// current precedence level, and shared parse state.
-///
-/// Stack-allocated reference. Strategies use this to delegate to
-/// next levels and create AST nodes.
+/// Context passed to PrimaryStrategy and ComparisonParsers.
+/// Provides expression parsing delegation and AST node creation.
 pub struct StrategyContext<'c> {
     pratt: &'c pratt::PrattParser,
     pub(crate) parse_ctx: &'c ParseContext,
@@ -51,15 +38,14 @@ impl<'c> StrategyContext<'c> {
         Self { pratt, parse_ctx }
     }
 
-    /// Parse a sub-expression at "next level" — in Pratt terms, parse with
-    /// min_bp high enough to stop before AND/OR (used by BETWEEN, comparison RHS).
+    /// Parse a sub-expression stopping before AND/OR (bp=5).
+    /// Used by BETWEEN (to not consume AND), comparison RHS.
     #[inline]
     pub fn parse_next_level<'a>(&self, input: &mut &'a str) -> PResult<ast::Expr> {
-        // bp=5 stops before AND(3) and OR(1), but allows arithmetic(7+) and comparison(5+)
         self.pratt.parse_bp(input, self.parse_ctx, 5)
     }
 
-    /// Parse a full expression (delegates to Pratt parser).
+    /// Parse a full expression from lowest precedence.
     #[inline]
     pub fn parse_expr<'a>(&self, input: &mut &'a str) -> PResult<ast::Expr> {
         self.pratt.parse_expr(input, self.parse_ctx)
@@ -70,11 +56,6 @@ impl<'c> StrategyContext<'c> {
     pub fn node<T>(&self, value: T) -> ast::AstNode<T> {
         self.parse_ctx.node(value)
     }
-}
-
-/// Each precedence level implements this trait.
-pub trait ExprStrategy {
-    fn parse<'a>(&self, input: &mut &'a str, ctx: &StrategyContext<'_>) -> PResult<ast::Expr>;
 }
 
 /// Expression parser — delegates to PrattParser.
