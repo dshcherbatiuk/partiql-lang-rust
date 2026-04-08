@@ -51,10 +51,9 @@ pub fn kw<'a>(keyword: &'static str) -> impl Parser<&'a str, &'a str, ContextErr
     move |input: &mut &'a str| {
         let checkpoint = *input;
         let matched = winnow::ascii::Caseless(keyword).parse_next(input)?;
-        // Check word boundary — next char must not be alphanumeric or underscore.
-        // Prevents `OR` from matching prefix of `ORDER`, `IN` from `INSERT`, etc.
-        if let Some(next) = input.chars().next() {
-            if next.is_ascii_alphanumeric() || next == '_' {
+        // Word boundary — byte-level check (no Unicode iterator allocation).
+        if let Some(&b) = input.as_bytes().first() {
+            if b.is_ascii_alphanumeric() || b == b'_' {
                 *input = checkpoint;
                 return Err(winnow::error::ErrMode::Backtrack(ContextError::new()));
             }

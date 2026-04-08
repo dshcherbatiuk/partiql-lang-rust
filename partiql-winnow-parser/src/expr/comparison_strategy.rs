@@ -119,13 +119,12 @@ impl ExprStrategy for ComparisonStrategy {
 }
 
 /// Match `<` but NOT `<<` (bag open) or `<=` or `<>`.
-fn parse_single_lt<'a>(
-    input: &mut &'a str,
-) -> PResult<&'a str> {
+#[inline]
+fn parse_single_lt<'a>(input: &mut &'a str) -> PResult<&'a str> {
     let checkpoint = *input;
     let matched = lit("<").parse_next(input)?;
-    if let Some(next) = input.chars().next() {
-        if next == '<' || next == '=' || next == '>' {
+    if let Some(&b) = input.as_bytes().first() {
+        if b == b'<' || b == b'=' || b == b'>' {
             *input = checkpoint;
             return Err(winnow::error::ErrMode::Backtrack(
                 winnow::error::ContextError::new(),
@@ -136,13 +135,12 @@ fn parse_single_lt<'a>(
 }
 
 /// Match `>` but NOT `>>` (bag close) or `>=`.
-fn parse_single_gt<'a>(
-    input: &mut &'a str,
-) -> PResult<&'a str> {
+#[inline]
+fn parse_single_gt<'a>(input: &mut &'a str) -> PResult<&'a str> {
     let checkpoint = *input;
     let matched = lit(">").parse_next(input)?;
-    if let Some(next) = input.chars().next() {
-        if next == '>' || next == '=' {
+    if let Some(&b) = input.as_bytes().first() {
+        if b == b'>' || b == b'=' {
             *input = checkpoint;
             return Err(winnow::error::ErrMode::Backtrack(
                 winnow::error::ContextError::new(),

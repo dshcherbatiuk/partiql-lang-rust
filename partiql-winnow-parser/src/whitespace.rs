@@ -8,23 +8,38 @@
 //! - `ws0()` — optional whitespace (0+ chars). Used around operators:
 //!   `expr ws0 '=' ws0 expr`
 
-use winnow::ascii::{multispace0, multispace1};
+use winnow::error::ContextError;
 use winnow::prelude::*;
 
 /// Mandatory whitespace — at least one space, tab, or newline.
-///
-/// Use after keywords that require separation from the next token:
-/// `SELECT`, `FROM`, `WHERE`, `INTO`, etc.
+/// Inline ASCII fast path — no winnow scanner overhead for common case.
+#[inline]
 pub fn ws<'a>(input: &mut &'a str) -> PResult<()> {
-    multispace1.void().parse_next(input)
+    let bytes = input.as_bytes();
+    if bytes.is_empty() || !bytes[0].is_ascii_whitespace() {
+        return Err(winnow::error::ErrMode::Backtrack(ContextError::new()));
+    }
+    let mut i = 1;
+    while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+        i += 1;
+    }
+    *input = &input[i..];
+    Ok(())
 }
 
 /// Optional whitespace — zero or more spaces, tabs, or newlines.
-///
-/// Use around operators and punctuation where whitespace is optional:
-/// commas, parentheses, `=`, `<`, `>`, etc.
+/// Inline ASCII fast path — no winnow scanner overhead.
+#[inline]
 pub fn ws0<'a>(input: &mut &'a str) -> PResult<()> {
-    multispace0.void().parse_next(input)
+    let bytes = input.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() && bytes[i].is_ascii_whitespace() {
+        i += 1;
+    }
+    if i > 0 {
+        *input = &input[i..];
+    }
+    Ok(())
 }
 
 #[cfg(test)]
