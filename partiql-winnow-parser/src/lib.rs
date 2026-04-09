@@ -13,5 +13,5 @@ mod keyword;
 mod literal;
 pub mod parse_context;
 pub mod parsed_select;
-pub mod select;
+pub mod dql;
 mod whitespace;

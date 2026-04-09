@@ -11,7 +11,7 @@ use super::JoinParser;
 use crate::expr::ExprChain;
 use crate::keyword::ch;
 use crate::parse_context::ParseContext;
-use crate::select::from_clause::parse_source;
+use crate::dql::from_clause::parse_source;
 use crate::whitespace::ws0;
 
 pub struct CommaJoinParser<'p> {
@@ -47,9 +47,9 @@ impl<'p> JoinParser for CommaJoinParser<'p> {
 #[cfg(test)]
 mod tests {
     use crate::parse_context::ParseContext;
-    use crate::select::from_clause::FromClauseParser;
-    use crate::select::ClauseParser;
-    use crate::select::SelectParser;
+    use crate::dql::from_clause::FromClauseParser;
+    use crate::dql::ClauseParser;
+    use crate::dql::SelectParser;
     use partiql_ast::ast::{FromSource, JoinKind};
 
     fn setup() -> (SelectParser, ParseContext) {

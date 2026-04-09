@@ -40,7 +40,7 @@ impl<'p> ClauseParser for WhereClauseParser<'p> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::select::SelectParser;
+    use crate::dql::SelectParser;
     use partiql_ast::ast::{BinOpKind, Expr};
 
     // Helper: create a parser and context

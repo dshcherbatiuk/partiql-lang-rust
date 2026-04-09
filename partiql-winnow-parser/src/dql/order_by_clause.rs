@@ -83,7 +83,7 @@ impl<'p> ClauseParser for OrderByClauseParser<'p> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::select::SelectParser;
+    use crate::dql::SelectParser;
     use partiql_ast::ast::{NullOrderingSpec, OrderingSpec};
 
     fn setup() -> (SelectParser, ParseContext) {

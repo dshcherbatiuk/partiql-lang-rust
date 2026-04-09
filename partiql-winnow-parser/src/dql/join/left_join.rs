@@ -1,7 +1,7 @@
-//! RIGHT [OUTER] JOIN parser.
+//! LEFT [OUTER] JOIN parser.
 //!
 //! ```text
-//! right_join ::= RIGHT [OUTER] JOIN from_source ON expr
+//! left_join ::= LEFT [OUTER] JOIN from_source ON expr
 //! ```
 
 use partiql_ast::ast::{FromSource, Join, JoinKind, JoinSpec};
@@ -11,28 +11,28 @@ use super::JoinParser;
 use crate::expr::ExprChain;
 use crate::keyword::kw;
 use crate::parse_context::ParseContext;
-use crate::select::from_clause::parse_source;
+use crate::dql::from_clause::parse_source;
 use crate::whitespace::{ws, ws0};
 
-pub struct RightJoinParser<'p> {
+pub struct LeftJoinParser<'p> {
     chain: &'p ExprChain,
 }
 
-impl<'p> RightJoinParser<'p> {
+impl<'p> LeftJoinParser<'p> {
     pub fn new(chain: &'p ExprChain) -> Self {
         Self { chain }
     }
 }
 
-impl<'p> JoinParser for RightJoinParser<'p> {
+impl<'p> JoinParser for LeftJoinParser<'p> {
     fn parse(
         &self,
         input: &mut &str,
         pctx: &ParseContext,
         left: &FromSource,
     ) -> PResult<FromSource> {
-        (kw("RIGHT"), ws).parse_next(input)?;
-        let _ = (kw("OUTER"), ws).parse_next(input);
+        (kw("LEFT"), ws).parse_next(input)?;
+        let _ = (kw("OUTER"), ws).parse_next(input); // optional OUTER
         (kw("JOIN"), ws).parse_next(input)?;
 
         let right = parse_source(input, self.chain, pctx)?;
@@ -46,7 +46,7 @@ impl<'p> JoinParser for RightJoinParser<'p> {
         };
 
         Ok(FromSource::Join(pctx.node(Join {
-            kind: JoinKind::Right,
+            kind: JoinKind::Left,
             left: Box::new(left.clone()),
             right: Box::new(right),
             predicate,
@@ -57,9 +57,9 @@ impl<'p> JoinParser for RightJoinParser<'p> {
 #[cfg(test)]
 mod tests {
     use crate::parse_context::ParseContext;
-    use crate::select::from_clause::FromClauseParser;
-    use crate::select::ClauseParser;
-    use crate::select::SelectParser;
+    use crate::dql::from_clause::FromClauseParser;
+    use crate::dql::ClauseParser;
+    use crate::dql::SelectParser;
     use partiql_ast::ast::{FromSource, JoinKind};
 
     fn setup() -> (SelectParser, ParseContext) {
@@ -67,16 +67,31 @@ mod tests {
     }
 
     #[test]
-    fn test_right_join() {
+    fn test_left_join() {
         let (parser, pctx) = setup();
-        let mut input = "users RIGHT JOIN orders ON users.id = orders.user_id WHERE";
+        let mut input = "users LEFT JOIN orders ON users.id = orders.user_id WHERE";
         let result = FromClauseParser::new(parser.chain())
             .parse(&mut input, &pctx)
             .expect("parse failed");
         match &result.node.source {
             FromSource::Join(join) => {
-                assert_eq!(join.node.kind, JoinKind::Right);
+                assert_eq!(join.node.kind, JoinKind::Left);
                 assert!(join.node.predicate.is_some());
+            }
+            other => panic!("expected Join, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_left_outer_join() {
+        let (parser, pctx) = setup();
+        let mut input = "users LEFT OUTER JOIN orders ON users.id = orders.user_id WHERE";
+        let result = FromClauseParser::new(parser.chain())
+            .parse(&mut input, &pctx)
+            .expect("parse failed");
+        match &result.node.source {
+            FromSource::Join(join) => {
+                assert_eq!(join.node.kind, JoinKind::Left);
             }
             other => panic!("expected Join, got {:?}", other),
         }

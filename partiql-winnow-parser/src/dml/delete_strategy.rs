@@ -11,7 +11,7 @@ use super::DmlStrategy;
 use crate::expr::ExprChain;
 use crate::keyword::kw;
 use crate::parse_context::ParseContext;
-use crate::select::from_clause::parse_source;
+use crate::dql::from_clause::parse_source;
 use crate::whitespace::{ws, ws0};
 
 pub struct DeleteStrategy<'p> {

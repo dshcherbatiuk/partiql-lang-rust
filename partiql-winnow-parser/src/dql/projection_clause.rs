@@ -94,7 +94,7 @@ impl<'p> ClauseParser for ProjectionClause<'p> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::select::SelectParser;
+    use crate::dql::SelectParser;
     use partiql_ast::ast::{ProjectItem, SetQuantifier};
 
     // Helper: create a parser and context

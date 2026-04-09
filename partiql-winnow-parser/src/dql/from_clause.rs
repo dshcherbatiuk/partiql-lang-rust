@@ -163,7 +163,7 @@ impl<'p> ClauseParser for FromClauseParser<'p> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::select::SelectParser;
+    use crate::dql::SelectParser;
     use partiql_ast::ast::Expr;
 
     // Helper: create a parser and context

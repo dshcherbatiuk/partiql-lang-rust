@@ -40,7 +40,7 @@ impl<'p> ClauseParser for HavingClauseParser<'p> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::select::SelectParser;
+    use crate::dql::SelectParser;
     use partiql_ast::ast::{BinOpKind, Expr};
 
     fn setup() -> (SelectParser, ParseContext) {

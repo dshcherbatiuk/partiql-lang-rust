@@ -9,7 +9,7 @@ use smallvec::SmallVec;
 pub type AliasMap = SmallVec<[(String, String); 4]>;
 
 use crate::parse_context::ParseContext;
-use crate::select::SelectParser;
+use crate::dql::SelectParser;
 
 /// Parsed SELECT query with pre-extracted metadata.
 #[derive(Debug)]
@@ -162,7 +162,7 @@ fn collect_unnest_aliases(source: &FromSource, aliases: &mut AliasMap) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::select::SelectParser;
+    use crate::dql::SelectParser;
 
     fn parse(sql: &str) -> ParsedSelect {
         let parser = SelectParser::new();

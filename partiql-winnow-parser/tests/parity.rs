@@ -8,7 +8,7 @@
 use partiql_ast::ast::{self, BinOpKind, FromSource, JoinKind, ProjectionKind, QuerySet};
 use partiql_parser::Parser;
 use partiql_winnow_parser::parse_context::ParseContext;
-use partiql_winnow_parser::select::SelectParser;
+use partiql_winnow_parser::dql::SelectParser;
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 

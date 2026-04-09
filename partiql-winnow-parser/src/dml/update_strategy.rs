@@ -12,7 +12,7 @@ use crate::expr::ExprChain;
 use crate::identifier;
 use crate::keyword::{ch, kw};
 use crate::parse_context::ParseContext;
-use crate::select::from_clause::parse_source;
+use crate::dql::from_clause::parse_source;
 use crate::whitespace::{ws, ws0};
 
 /// Parse assignment target as a simple identifier or dotted path.

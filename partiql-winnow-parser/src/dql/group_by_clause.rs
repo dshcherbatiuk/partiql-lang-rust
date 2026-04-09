@@ -91,7 +91,7 @@ impl<'p> ClauseParser for GroupByClauseParser<'p> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::select::SelectParser;
+    use crate::dql::SelectParser;
 
     fn setup() -> (SelectParser, ParseContext) {
         (SelectParser::new(), ParseContext::new())
