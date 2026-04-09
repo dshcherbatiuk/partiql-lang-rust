@@ -91,9 +91,11 @@ fn parse_struct_value<'a>(
     input: &mut &'a str,
     ctx: &StrategyContext<'_>,
 ) -> PResult<ast::Expr> {
-    // "double-quoted" → string literal in struct context
+    // "double-quoted" → string literal in struct context (including empty "")
     if input.starts_with('"') {
-        let s = identifier::quoted_identifier(input)?;
+        let _ = '"'.parse_next(input)?;
+        let s = winnow::token::take_while(0.., |c: char| c != '"').parse_next(input)?;
+        let _ = '"'.parse_next(input)?;
         return Ok(ast::Expr::Lit(ctx.node(ast::Lit::CharStringLit(
             s.to_string(),
         ))));
@@ -263,6 +265,37 @@ mod tests {
                 assert!(matches!(
                     &*n.node.fields[0].first,
                     ast::Expr::Lit(l) if matches!(&l.node, Lit::CharStringLit(s) if s == "fde.users")
+                ));
+            }
+            other => panic!("expected Struct, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_empty_double_quoted_value() {
+        // "" as a value in struct context should be an empty string literal
+        let expr = parse(r#"{"key": ""}"#);
+        match &expr {
+            ast::Expr::Struct(n) => {
+                assert_eq!(n.node.fields.len(), 1);
+                assert!(matches!(
+                    &*n.node.fields[0].second,
+                    ast::Expr::Lit(l) if matches!(&l.node, Lit::CharStringLit(s) if s.is_empty())
+                ));
+            }
+            other => panic!("expected Struct, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_empty_single_quoted_value() {
+        let expr = parse("{'key': ''}");
+        match &expr {
+            ast::Expr::Struct(n) => {
+                assert_eq!(n.node.fields.len(), 1);
+                assert!(matches!(
+                    &*n.node.fields[0].second,
+                    ast::Expr::Lit(l) if matches!(&l.node, Lit::CharStringLit(s) if s.is_empty())
                 ));
             }
             other => panic!("expected Struct, got {:?}", other),
