@@ -40,7 +40,8 @@ impl LiteralStrategy for StructConstructorStrategy {
             let _ = ws0(input);
             ch(':').parse_next(input)?;
             let _ = ws0(input);
-            let value = ctx.parse_expr(input)?;
+            // In struct context, "double-quoted" values are string literals (Ion compat)
+            let value = parse_struct_value(input, ctx)?;
 
             fields.push(ExprPair {
                 first: Box::new(key),
@@ -82,6 +83,23 @@ fn parse_struct_key<'a>(
     Ok(ast::Expr::Lit(ctx.node(ast::Lit::CharStringLit(
         s.to_string(),
     ))))
+}
+
+/// Parse struct value — in struct context, "double-quoted" is a string literal (Ion compat).
+/// Falls through to normal expression parsing for everything else.
+fn parse_struct_value<'a>(
+    input: &mut &'a str,
+    ctx: &StrategyContext<'_>,
+) -> PResult<ast::Expr> {
+    // "double-quoted" → string literal in struct context
+    if input.starts_with('"') {
+        let s = identifier::quoted_identifier(input)?;
+        return Ok(ast::Expr::Lit(ctx.node(ast::Lit::CharStringLit(
+            s.to_string(),
+        ))));
+    }
+    // Everything else: normal expression (handles 'single', numbers, bools, nested structs, lists, etc.)
+    ctx.parse_expr(input)
 }
 
 #[cfg(test)]
@@ -185,15 +203,15 @@ mod tests {
     }
 
     #[test]
-    fn test_double_quoted_value_is_identifier() {
-        // "Alice" as a VALUE is a case-sensitive identifier in PartiQL
+    fn test_double_quoted_value_is_string_literal() {
+        // "Alice" as a VALUE in struct context is a string literal (Ion compat)
         let expr = parse(r#"{'name': "Alice"}"#);
         match &expr {
             ast::Expr::Struct(n) => {
                 assert_eq!(n.node.fields.len(), 1);
                 assert!(matches!(
                     &*n.node.fields[0].second,
-                    ast::Expr::VarRef(v) if v.node.name.value == "Alice"
+                    ast::Expr::Lit(l) if matches!(&l.node, Lit::CharStringLit(s) if s == "Alice")
                 ));
             }
             other => panic!("expected Struct, got {:?}", other),
