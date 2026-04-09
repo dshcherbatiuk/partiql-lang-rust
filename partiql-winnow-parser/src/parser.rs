@@ -7,12 +7,12 @@ use crate::dml::parsed_dml::{DmlQueryParser, ParsedDml};
 use crate::dql::SelectParser;
 use crate::expr::ExprChain;
 use crate::parse_context::ParseContext;
-use crate::parsed_select::ParsedSelect;
+use crate::parsed_dql::ParsedDql;
 
 /// Result of parsing any PartiQL query.
 #[derive(Debug)]
 pub enum ParsedQuery {
-    Select(ParsedSelect),
+    Dql(ParsedDql),
     Dml(ParsedDml),
 }
 
@@ -33,7 +33,7 @@ impl WinnowParser {
     /// Parse any PartiQL query in one call.
     pub fn parse(&self, sql: &str) -> Result<ParsedQuery, String> {
         // Try SELECT first (most frequent operation)
-        if let Ok(select) = self.try_select(sql) {
+        if let Ok(select) = self.try_dql(sql) {
             return Ok(select);
         }
 
@@ -56,8 +56,8 @@ impl WinnowParser {
         }
     }
 
-    fn try_select(&self, sql: &str) -> Result<ParsedQuery, String> {
-        ParsedSelect::parse(&self.select_parser, sql).map(ParsedQuery::Select)
+    fn try_dql(&self, sql: &str) -> Result<ParsedQuery, String> {
+        ParsedDql::parse(&self.select_parser, sql).map(ParsedQuery::Dql)
     }
 }
 
@@ -79,7 +79,7 @@ mod tests {
     #[test]
     fn test_select_star() {
         match parse("SELECT * FROM users") {
-            ParsedQuery::Select(s) => {
+            ParsedQuery::Dql(s) => {
                 assert_eq!(s.table_names.as_slice(), &["users"]);
                 assert!(s.where_clause.is_none());
                 assert!(s.unnest_aliases.is_empty());
@@ -91,7 +91,7 @@ mod tests {
     #[test]
     fn test_select_where() {
         match parse("SELECT a FROM t WHERE a = 1") {
-            ParsedQuery::Select(s) => {
+            ParsedQuery::Dql(s) => {
                 assert_eq!(s.table_names.as_slice(), &["t"]);
                 match &s.where_clause {
                     Some(Expr::BinOp(op)) => assert_eq!(op.node.kind, BinOpKind::Eq),
@@ -105,7 +105,7 @@ mod tests {
     #[test]
     fn test_select_unnest() {
         match parse(r#"SELECT p.id FROM "fde.users" u, u.platformData p WHERE p.id = 'x'"#) {
-            ParsedQuery::Select(s) => {
+            ParsedQuery::Dql(s) => {
                 assert_eq!(s.table_names.as_slice(), &["fde.users"]);
                 assert!(s.where_clause.is_some());
                 let alias = s.unnest_aliases.iter().find(|(k, _)| k == "p");
@@ -191,7 +191,7 @@ mod tests {
     #[test]
     fn test_case_insensitive_select() {
         match parse("select a from t where a = 1") {
-            ParsedQuery::Select(s) => {
+            ParsedQuery::Dql(s) => {
                 assert_eq!(s.table_names.as_slice(), &["t"]);
                 assert!(s.where_clause.is_some());
             }

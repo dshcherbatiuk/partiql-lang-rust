@@ -1,4 +1,4 @@
-//! ParsedSelect — single-pass parse result with pre-extracted metadata.
+//! ParsedDql — single-pass parse result with pre-extracted metadata.
 //!
 //! Eliminates the need to re-walk the AST after parsing to extract
 //! WHERE clause, table names, and unnest aliases.
@@ -13,7 +13,7 @@ use crate::dql::SelectParser;
 
 /// Parsed SELECT query with pre-extracted metadata.
 #[derive(Debug)]
-pub struct ParsedSelect {
+pub struct ParsedDql {
     /// Full AST for LogicalPlanner::lower()
     pub ast: AstNode<TopLevelQuery>,
     /// WHERE clause expression (if present)
@@ -24,7 +24,7 @@ pub struct ParsedSelect {
     pub unnest_aliases: AliasMap,
 }
 
-impl ParsedSelect {
+impl ParsedDql {
     /// Parse a SELECT query and extract metadata in one pass.
     pub fn parse(parser: &SelectParser, sql: &str) -> Result<Self, String> {
         let pctx = ParseContext::new();
@@ -164,9 +164,9 @@ mod tests {
     use super::*;
     use crate::dql::SelectParser;
 
-    fn parse(sql: &str) -> ParsedSelect {
+    fn parse(sql: &str) -> ParsedDql {
         let parser = SelectParser::new();
-        ParsedSelect::parse(&parser, sql).expect("parse failed")
+        ParsedDql::parse(&parser, sql).expect("parse failed")
     }
 
     #[test]

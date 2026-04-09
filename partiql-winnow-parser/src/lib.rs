@@ -13,6 +13,6 @@ mod identifier;
 mod keyword;
 mod literal;
 pub mod parse_context;
-pub mod parsed_select;
+pub mod parsed_dql;
 pub mod parser;
 mod whitespace;
