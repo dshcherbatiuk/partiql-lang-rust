@@ -54,6 +54,20 @@ pub struct DeleteOp {
     pub where_clause: Option<Expr>,
 }
 
+impl ParsedDml {
+    /// Extract the target table name from any DML variant.
+    #[inline]
+    pub fn table_name(&self) -> String {
+        match self {
+            ParsedDml::Insert(op) => op.table_name.clone(),
+            ParsedDml::InsertOnConflict(op) => op.table_name.clone(),
+            ParsedDml::Replace(op) => op.table_name.clone(),
+            ParsedDml::Upsert(op) => op.table_name.clone(),
+            ParsedDml::Delete(op) => op.table_name.clone(),
+        }
+    }
+}
+
 /// FDE DML parser — parses once, returns FDE-ready types.
 pub struct DmlQueryParser<'p> {
     chain: &'p ExprChain,
