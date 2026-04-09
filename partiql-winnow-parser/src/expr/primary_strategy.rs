@@ -18,7 +18,7 @@
 
 use partiql_ast::ast;
 use partiql_ast::ast::{
-    Call, CallArg, CaseSensitivity, ScopeQualifier, SymbolPrimitive, VarRef,
+    Call, CallAgg, CallArg, CaseSensitivity, ScopeQualifier, SymbolPrimitive, VarRef,
 };
 use winnow::prelude::*;
 
@@ -167,13 +167,7 @@ fn parse_identifier_or_call<'a>(
 
         // Empty args: name()
         if ch(')').parse_next(input).is_ok() {
-            return Ok(ast::Expr::Call(ctx.node(Call {
-                func_name: SymbolPrimitive {
-                    value: name.to_string(),
-                    case: CaseSensitivity::CaseInsensitive,
-                },
-                args,
-            })));
+            return Ok(make_call(ctx, name, args));
         }
 
         // Star arg: COUNT(*)
@@ -181,13 +175,7 @@ fn parse_identifier_or_call<'a>(
             args.push(ctx.node(CallArg::Star()));
             let _ = ws0(input);
             ch(')').parse_next(input)?;
-            return Ok(ast::Expr::Call(ctx.node(Call {
-                func_name: SymbolPrimitive {
-                    value: name.to_string(),
-                    case: CaseSensitivity::CaseInsensitive,
-                },
-                args,
-            })));
+            return Ok(make_call(ctx, name, args));
         }
 
         // Positional args: name(expr, expr, ...)
@@ -203,14 +191,39 @@ fn parse_identifier_or_call<'a>(
         let _ = ws0(input);
         ch(')').parse_next(input)?;
 
-        return Ok(ast::Expr::Call(ctx.node(Call {
-            func_name: SymbolPrimitive {
-                value: name.to_string(),
-                case: CaseSensitivity::CaseInsensitive,
-            },
-            args,
-        })));
+        return Ok(make_call(ctx, name, args));
     }
+
+/// Known SQL aggregate functions — produce CallAgg instead of Call.
+#[inline]
+fn is_aggregate(name: &str) -> bool {
+    matches!(
+        name.as_bytes(),
+        [b'C' | b'c', b'O' | b'o', b'U' | b'u', b'N' | b'n', b'T' | b't']
+        | [b'S' | b's', b'U' | b'u', b'M' | b'm']
+        | [b'A' | b'a', b'V' | b'v', b'G' | b'g']
+        | [b'M' | b'm', b'I' | b'i', b'N' | b'n']
+        | [b'M' | b'm', b'A' | b'a', b'X' | b'x']
+    )
+}
+
+/// Create Call or CallAgg based on function name.
+#[inline]
+fn make_call(
+    ctx: &StrategyContext<'_>,
+    name: &str,
+    args: Vec<ast::AstNode<CallArg>>,
+) -> ast::Expr {
+    let func_name = SymbolPrimitive {
+        value: name.to_string(),
+        case: CaseSensitivity::CaseInsensitive,
+    };
+    if is_aggregate(name) {
+        ast::Expr::CallAgg(ctx.node(CallAgg { func_name, args }))
+    } else {
+        ast::Expr::Call(ctx.node(Call { func_name, args }))
+    }
+}
 
     Ok(ast::Expr::VarRef(ctx.node(VarRef {
         name: SymbolPrimitive { value: name.to_string(), case },
@@ -462,10 +475,11 @@ mod tests {
     }
 
     #[test]
-    fn test_call_star() {
+    fn test_call_agg_star() {
+        // COUNT is an aggregate — produces CallAgg, not Call
         let e = parse("COUNT(*)");
-        assert!(matches!(&e, ast::Expr::Call(_)));
-        if let ast::Expr::Call(n) = &e {
+        assert!(matches!(&e, ast::Expr::CallAgg(_)));
+        if let ast::Expr::CallAgg(n) = &e {
             assert_eq!(n.node.func_name.value, "COUNT");
             assert_eq!(n.node.args.len(), 1);
             assert!(matches!(n.node.args[0].node, CallArg::Star()));

@@ -314,12 +314,12 @@ mod tests {
                 assert_eq!(items.len(), 1);
                 match &items[0].node {
                     ast::ProjectItem::ProjectExpr(pe) => match &*pe.expr {
-                        ast::Expr::Call(c) => {
+                        ast::Expr::CallAgg(c) => {
                             assert_eq!(c.node.func_name.value, "COUNT");
                             assert_eq!(c.node.args.len(), 1);
                             assert!(matches!(c.node.args[0].node, CallArg::Star()));
                         }
-                        other => panic!("expected Call, got {:?}", other),
+                        other => panic!("expected CallAgg, got {:?}", other),
                     },
                     other => panic!("expected ProjectExpr, got {:?}", other),
                 }
