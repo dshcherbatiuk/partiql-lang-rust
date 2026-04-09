@@ -14,6 +14,7 @@ use winnow::prelude::*;
 
 use super::LiteralStrategy;
 use crate::expr::StrategyContext;
+use crate::identifier;
 use crate::keyword::ch;
 use crate::whitespace::ws0;
 
@@ -34,7 +35,8 @@ impl LiteralStrategy for StructConstructorStrategy {
         let mut fields = Vec::new();
         loop {
             let _ = ws0(input);
-            let key = ctx.parse_expr(input)?;
+            // Struct keys are always string literals — 'key', "key", or unquoted key
+            let key = parse_struct_key(input, ctx)?;
             let _ = ws0(input);
             ch(':').parse_next(input)?;
             let _ = ws0(input);
@@ -55,6 +57,31 @@ impl LiteralStrategy for StructConstructorStrategy {
 
         Ok(ast::Expr::Struct(ctx.node(ast::Struct { fields })))
     }
+}
+
+/// Parse struct key as string literal — supports 'key', "key", and unquoted key.
+/// In Ion/PartiQL struct context, all keys are string literals regardless of quoting.
+fn parse_struct_key<'a>(
+    input: &mut &'a str,
+    ctx: &StrategyContext<'_>,
+) -> PResult<ast::Expr> {
+    // Single-quoted: 'key'
+    if input.starts_with('\'') {
+        let s = crate::literal::ion::string::sql_string.parse_next(input)?;
+        return Ok(ast::Expr::Lit(ctx.node(ast::Lit::CharStringLit(s))));
+    }
+    // Double-quoted: "key" — treat as string literal in struct context (not identifier)
+    if input.starts_with('"') {
+        let s = identifier::quoted_identifier(input)?;
+        return Ok(ast::Expr::Lit(ctx.node(ast::Lit::CharStringLit(
+            s.to_string(),
+        ))));
+    }
+    // Unquoted: key — treat as string literal
+    let s = identifier::unquoted_identifier(input)?;
+    Ok(ast::Expr::Lit(ctx.node(ast::Lit::CharStringLit(
+        s.to_string(),
+    ))))
 }
 
 #[cfg(test)]
@@ -129,6 +156,96 @@ mod tests {
             ast::Expr::Struct(n) => {
                 assert_eq!(n.node.fields.len(), 2);
                 assert!(matches!(&*n.node.fields[0].second, ast::Expr::List(_)));
+            }
+            other => panic!("expected Struct, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_double_quoted_key_is_string_literal() {
+        // "key" in struct context is a string literal, not an identifier
+        // Values use single quotes (PartiQL string literals)
+        let expr = parse(r#"{"name": 'Alice'}"#);
+        match &expr {
+            ast::Expr::Struct(n) => {
+                assert_eq!(n.node.fields.len(), 1);
+                // Key: "name" → CharStringLit("name")
+                assert!(matches!(
+                    &*n.node.fields[0].first,
+                    ast::Expr::Lit(l) if matches!(&l.node, Lit::CharStringLit(s) if s == "name")
+                ));
+                // Value: 'Alice' → CharStringLit("Alice")
+                assert!(matches!(
+                    &*n.node.fields[0].second,
+                    ast::Expr::Lit(l) if matches!(&l.node, Lit::CharStringLit(s) if s == "Alice")
+                ));
+            }
+            other => panic!("expected Struct, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_double_quoted_value_is_identifier() {
+        // "Alice" as a VALUE is a case-sensitive identifier in PartiQL
+        let expr = parse(r#"{'name': "Alice"}"#);
+        match &expr {
+            ast::Expr::Struct(n) => {
+                assert_eq!(n.node.fields.len(), 1);
+                assert!(matches!(
+                    &*n.node.fields[0].second,
+                    ast::Expr::VarRef(v) if v.node.name.value == "Alice"
+                ));
+            }
+            other => panic!("expected Struct, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_unquoted_key_is_string_literal() {
+        // Unquoted key in struct context is also a string literal
+        let expr = parse("{name: 'Alice'}");
+        match &expr {
+            ast::Expr::Struct(n) => {
+                assert_eq!(n.node.fields.len(), 1);
+                assert!(matches!(
+                    &*n.node.fields[0].first,
+                    ast::Expr::Lit(l) if matches!(&l.node, Lit::CharStringLit(s) if s == "name")
+                ));
+            }
+            other => panic!("expected Struct, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_mixed_key_styles() {
+        // Mix of 'single', "double", and unquoted keys
+        let expr = parse(r#"{'a': 1, "b": 2, c: 3}"#);
+        match &expr {
+            ast::Expr::Struct(n) => {
+                assert_eq!(n.node.fields.len(), 3);
+                // All keys should be string literals
+                for (i, expected) in ["a", "b", "c"].iter().enumerate() {
+                    assert!(matches!(
+                        &*n.node.fields[i].first,
+                        ast::Expr::Lit(l) if matches!(&l.node, Lit::CharStringLit(s) if s == *expected)
+                    ), "key {i} should be CharStringLit({expected})");
+                }
+            }
+            other => panic!("expected Struct, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_ion_string_key_with_dots() {
+        // "fde.users" as a struct key
+        let expr = parse(r#"{"fde.users": 'value'}"#);
+        match &expr {
+            ast::Expr::Struct(n) => {
+                assert_eq!(n.node.fields.len(), 1);
+                assert!(matches!(
+                    &*n.node.fields[0].first,
+                    ast::Expr::Lit(l) if matches!(&l.node, Lit::CharStringLit(s) if s == "fde.users")
+                ));
             }
             other => panic!("expected Struct, got {:?}", other),
         }
