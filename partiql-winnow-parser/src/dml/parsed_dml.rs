@@ -55,11 +55,11 @@ pub struct DeleteOp {
 }
 
 /// FDE DML parser — parses once, returns FDE-ready types.
-pub struct FdeDmlParser<'p> {
+pub struct DmlQueryParser<'p> {
     chain: &'p ExprChain,
 }
 
-impl<'p> FdeDmlParser<'p> {
+impl<'p> DmlQueryParser<'p> {
     pub fn new(chain: &'p ExprChain) -> Self {
         Self { chain }
     }
@@ -93,27 +93,6 @@ impl<'p> FdeDmlParser<'p> {
         *input = checkpoint;
 
         None
-    }
-
-    /// Fast DML detection — no parsing, just prefix check.
-    #[inline]
-    pub fn is_dml(query: &str) -> bool {
-        let bytes = query.trim().as_bytes();
-        if bytes.len() < 6 {
-            return false;
-        }
-        let upper: [u8; 6] = [
-            bytes[0].to_ascii_uppercase(),
-            bytes[1].to_ascii_uppercase(),
-            bytes[2].to_ascii_uppercase(),
-            bytes[3].to_ascii_uppercase(),
-            bytes[4].to_ascii_uppercase(),
-            bytes[5].to_ascii_uppercase(),
-        ];
-        matches!(
-            &upper,
-            b"INSERT" | b"REPLAC" | b"UPSERT" | b"DELETE" | b"UPDATE"
-        )
     }
 
     fn parse_table_name(&self, input: &mut &str) -> PResult<String> {
@@ -222,7 +201,7 @@ mod tests {
         let chain = ExprChain::new();
         let pctx = ParseContext::new();
         let mut i = sql;
-        let parser = FdeDmlParser::new(&chain);
+        let parser = DmlQueryParser::new(&chain);
         parser
             .parse(&mut i, &pctx)
             .expect("not DML")
@@ -308,14 +287,6 @@ mod tests {
     }
 
     #[test]
-    fn test_is_dml() {
-        assert!(FdeDmlParser::is_dml("INSERT INTO users <<>>"));
-        assert!(FdeDmlParser::is_dml("  REPLACE INTO users <<>>"));
-        assert!(FdeDmlParser::is_dml("UPSERT INTO users <<>>"));
-        assert!(FdeDmlParser::is_dml("DELETE FROM users"));
-        assert!(!FdeDmlParser::is_dml("SELECT * FROM users"));
-    }
-
     #[test]
     fn test_insert_nested_fde_pattern() {
         match parse(
