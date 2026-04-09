@@ -5,7 +5,6 @@
 
 use crate::dml::parsed_dml::{DmlQueryParser, ParsedDml};
 use crate::dql::SelectParser;
-use crate::expr::ExprChain;
 use crate::parse_context::ParseContext;
 use crate::parsed_dql::ParsedDql;
 
@@ -18,14 +17,12 @@ pub enum ParsedQuery {
 
 /// Single entry point parser — stateless, created once, reused.
 pub struct WinnowParser {
-    chain: ExprChain,
     select_parser: SelectParser,
 }
 
 impl WinnowParser {
     pub fn new() -> Self {
         Self {
-            chain: ExprChain::new(),
             select_parser: SelectParser::new(),
         }
     }
@@ -47,7 +44,7 @@ impl WinnowParser {
     }
 
     fn try_dml(&self, sql: &str, pctx: &ParseContext) -> Option<Result<ParsedQuery, String>> {
-        let parser = DmlQueryParser::new(&self.chain);
+        let parser = DmlQueryParser::default();
         let mut input = sql;
         match parser.parse(&mut input, pctx) {
             Some(Ok(dml)) => Some(Ok(ParsedQuery::Dml(dml))),

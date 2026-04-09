@@ -69,12 +69,20 @@ impl ParsedDml {
 }
 
 /// FDE DML parser — parses once, returns FDE-ready types.
-pub struct DmlQueryParser<'p> {
-    chain: &'p ExprChain,
+pub struct DmlQueryParser {
+    chain: ExprChain,
 }
 
-impl<'p> DmlQueryParser<'p> {
-    pub fn new(chain: &'p ExprChain) -> Self {
+impl Default for DmlQueryParser {
+    fn default() -> Self {
+        Self {
+            chain: ExprChain::new(),
+        }
+    }
+}
+
+impl DmlQueryParser {
+    pub fn new(chain: ExprChain) -> Self {
         Self { chain }
     }
 
@@ -212,10 +220,9 @@ mod tests {
     use super::*;
 
     fn parse(sql: &str) -> ParsedDml {
-        let chain = ExprChain::new();
         let pctx = ParseContext::new();
         let mut i = sql;
-        let parser = DmlQueryParser::new(&chain);
+        let parser = DmlQueryParser::default();
         parser
             .parse(&mut i, &pctx)
             .expect("not DML")
