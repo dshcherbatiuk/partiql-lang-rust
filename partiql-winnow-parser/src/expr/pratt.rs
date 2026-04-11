@@ -6,7 +6,8 @@
 
 use partiql_ast::ast;
 use partiql_ast::ast::{
-    BinOp, BinOpKind, Lit, Path, PathExpr, PathStep, UniOp, UniOpKind,
+    BinOp, BinOpKind, CaseSensitivity, Lit, Path, PathExpr, PathStep, ScopeQualifier,
+    SymbolPrimitive, UniOp, UniOpKind, VarRef,
 };
 use winnow::prelude::*;
 
@@ -258,10 +259,17 @@ impl PrattParser {
             if ch('.').parse_next(input).is_ok() {
                 let _ = ws0(input);
                 let field = identifier::identifier(input)?;
+                // Wrap field name in VarRef (matching LALRPOP shape) so that
+                // downstream `name_resolver::infer_alias` can recover the field
+                // name as the projection alias instead of falling back to `_N`.
                 steps.push(PathStep::PathProject(PathExpr {
-                    index: Box::new(ast::Expr::Lit(pctx.node(Lit::CharStringLit(
-                        field.to_string(),
-                    )))),
+                    index: Box::new(ast::Expr::VarRef(pctx.node(VarRef {
+                        name: SymbolPrimitive {
+                            value: field.to_string(),
+                            case: CaseSensitivity::CaseInsensitive,
+                        },
+                        qualifier: ScopeQualifier::Unqualified,
+                    }))),
                 }));
                 matched = true;
                 let _ = ws0(input);

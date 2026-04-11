@@ -95,7 +95,7 @@ impl<'p> ClauseParser for ProjectionClause<'p> {
 mod tests {
     use super::*;
     use crate::dql::SelectParser;
-    use partiql_ast::ast::{ProjectItem, SetQuantifier};
+    use partiql_ast::ast::{Expr, PathStep, ProjectItem, SetQuantifier};
 
     // Helper: create a parser and context
     fn setup() -> (SelectParser, ParseContext) {
@@ -168,6 +168,54 @@ mod tests {
                 }
             }
             other => panic!("expected ProjectList, got {:?}", other),
+        }
+    }
+
+    /// `SELECT u.id` should produce a path step whose index is a `VarRef("id")`,
+    /// matching the LALRPOP parser shape. This is required so the downstream
+    /// `name_resolver::infer_alias` can recover the column name "id" instead of
+    /// falling back to the positional `_1` placeholder.
+    #[test]
+    fn test_path_step_uses_var_ref_for_alias_inference() {
+        let (parser, pctx) = setup();
+        let mut input = "u.id FROM";
+        let result = ProjectionClause::new(parser.chain())
+            .parse(&mut input, &pctx)
+            .expect("parse failed");
+
+        let items = match &result.kind {
+            ProjectionKind::ProjectList(items) => items,
+            other => panic!("expected ProjectList, got {:?}", other),
+        };
+        assert_eq!(items.len(), 1);
+
+        let project_expr = match &items[0].node {
+            ProjectItem::ProjectExpr(pe) => pe,
+            other => panic!("expected ProjectExpr, got {:?}", other),
+        };
+
+        let path = match &*project_expr.expr {
+            Expr::Path(p) => p,
+            other => panic!("expected Path expression, got {:?}", other),
+        };
+
+        let last_step = path.node.steps.last().expect("path should have one step");
+        let step_expr = match last_step {
+            PathStep::PathProject(pe) => &*pe.index,
+            other => panic!("expected PathProject step, got {:?}", other),
+        };
+
+        match step_expr {
+            Expr::VarRef(vr) => {
+                assert_eq!(
+                    vr.node.name.value, "id",
+                    "path step should reference field 'id'"
+                );
+            }
+            other => panic!(
+                "expected VarRef so name_resolver::infer_alias can recover 'id', got {:?}",
+                other
+            ),
         }
     }
 
