@@ -51,6 +51,46 @@ fn parity_select_star() {
     assert!(winn.from.is_some());
 }
 
+/// `SELECT u.*` — `.*` is a PathUnpivot step on the alias `u`. Both parsers
+/// must produce a ProjectList with one item that is `Path(VarRef("u"), [PathUnpivot])`.
+#[test]
+fn parity_select_path_unpivot() {
+    use partiql_ast::ast::{Expr, PathStep, ProjectItem};
+
+    let sql = r#"SELECT DISTINCT u.* FROM "schema.users" u WHERE u.email = 'a@b.c'"#;
+    let lalr = lalrpop_select(sql);
+    let (_, winn) = winnow_select(sql);
+
+    for (label, kind) in [
+        ("lalrpop", &lalr.project.node.kind),
+        ("winnow", &winn.project.node.kind),
+    ] {
+        let items = match kind {
+            ProjectionKind::ProjectList(items) => items,
+            other => panic!("{label}: expected ProjectList, got {other:?}"),
+        };
+        assert_eq!(items.len(), 1, "{label}: expected one project item");
+        let project_expr = match &items[0].node {
+            ProjectItem::ProjectExpr(pe) => pe,
+            other => panic!("{label}: expected ProjectExpr, got {other:?}"),
+        };
+        let path = match &*project_expr.expr {
+            Expr::Path(p) => p,
+            other => panic!("{label}: expected Path expression, got {other:?}"),
+        };
+        assert!(
+            matches!(*path.node.root, Expr::VarRef(_)),
+            "{label}: path root must be a VarRef"
+        );
+        assert_eq!(path.node.steps.len(), 1, "{label}: expected one path step");
+        assert!(
+            matches!(path.node.steps[0], PathStep::PathUnpivot),
+            "{label}: expected PathUnpivot, got {:?}",
+            path.node.steps[0]
+        );
+    }
+}
+
 #[test]
 fn parity_select_fields_with_where() {
     let sql = "SELECT a, b FROM users WHERE a = 1";

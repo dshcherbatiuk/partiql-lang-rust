@@ -258,6 +258,13 @@ impl PrattParser {
         loop {
             if ch('.').parse_next(input).is_ok() {
                 let _ = ws0(input);
+                // `.*` — PathUnpivot — emits all fields of the lhs as a tuple splat.
+                if ch('*').parse_next(input).is_ok() {
+                    steps.push(PathStep::PathUnpivot);
+                    matched = true;
+                    let _ = ws0(input);
+                    continue;
+                }
                 let field = identifier::identifier(input)?;
                 // Wrap field name in VarRef (matching LALRPOP shape) so that
                 // downstream `name_resolver::infer_alias` can recover the field
@@ -275,6 +282,15 @@ impl PrattParser {
                 let _ = ws0(input);
             } else if ch('[').parse_next(input).is_ok() {
                 let _ = ws0(input);
+                // `[*]` — PathForEach — iterate over all elements of a list/bag.
+                if ch('*').parse_next(input).is_ok() {
+                    let _ = ws0(input);
+                    ch(']').parse_next(input)?;
+                    steps.push(PathStep::PathForEach);
+                    matched = true;
+                    let _ = ws0(input);
+                    continue;
+                }
                 let idx = self.parse_bp(input, pctx, 0)?;
                 let _ = ws0(input);
                 ch(']').parse_next(input)?;

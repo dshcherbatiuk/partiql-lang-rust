@@ -458,6 +458,35 @@ mod tests {
         assert!(matches!(&e, ast::Expr::Path(_)));
     }
 
+    /// `u.*` is the PathUnpivot step — it emits all fields of `u` as a
+    /// tuple splat. LALRPOP supports it; the winnow parser must produce
+    /// the same shape so the logical planner can lower both consistently.
+    #[test]
+    fn test_path_dot_star_unpivot() {
+        let e = parse("u.*");
+        match &e {
+            ast::Expr::Path(p) => {
+                assert!(matches!(*p.node.root, ast::Expr::VarRef(_)));
+                assert_eq!(p.node.steps.len(), 1);
+                assert!(matches!(p.node.steps[0], ast::PathStep::PathUnpivot));
+            }
+            other => panic!("expected Path with PathUnpivot step, got {:?}", other),
+        }
+    }
+
+    /// `a[*]` is the PathForEach step — iterate over all elements of a list.
+    #[test]
+    fn test_path_bracket_star_for_each() {
+        let e = parse("a[*]");
+        match &e {
+            ast::Expr::Path(p) => {
+                assert_eq!(p.node.steps.len(), 1);
+                assert!(matches!(p.node.steps[0], ast::PathStep::PathForEach));
+            }
+            other => panic!("expected Path with PathForEach step, got {:?}", other),
+        }
+    }
+
     #[test]
     fn test_precedence_mul_over_add() {
         // 1 + 2 * 3 should parse as 1 + (2 * 3)
