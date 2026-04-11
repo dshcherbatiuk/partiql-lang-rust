@@ -19,7 +19,8 @@
 //!
 //! Returns a zero-allocation `&str` slice from the input.
 
-#![allow(dead_code)] // Implemented but not yet wired into Pratt parser
+// Wired into PrimaryStrategy for bare Ion timestamp expressions like
+// `2024-01-01T10:00:00Z` appearing in DML/SELECT.
 
 use winnow::combinator::alt;
 use winnow::prelude::*;

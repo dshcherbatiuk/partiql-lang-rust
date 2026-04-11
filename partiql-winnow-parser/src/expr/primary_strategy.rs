@@ -27,6 +27,7 @@ use super::StrategyContext;
 use crate::identifier;
 use crate::keyword::ch;
 use crate::literal::bag_strategy::BagConstructorStrategy;
+use crate::literal::ion::timestamp::ion_timestamp;
 use crate::literal::boolean_strategy::BooleanLiteralStrategy;
 use crate::literal::case_strategy::CaseExprStrategy;
 use crate::literal::list_strategy::ListConstructorStrategy;
@@ -76,6 +77,21 @@ impl PrimaryStrategy {
                 return self.literal_strategies[4].parse(input, ctx); // StringLiteralStrategy
             }
             Some(b'0'..=b'9') => {
+                // Bare Ion timestamps like `2024-01-01T10:00:00Z` start with
+                // digits but must beat the numeric literal parser, otherwise
+                // the leading year would be eaten as an int and the rest
+                // parsed as a binary subtraction. We commit to a timestamp
+                // only if four digits are followed by `T`, `-NN-NN`, or
+                // `-NN`+`T`. Anything shorter / different falls through to
+                // the numeric strategy on backtrack.
+                if looks_like_ion_timestamp(input) {
+                    let checkpoint = *input;
+                    if let Ok(ts) = ion_timestamp(input) {
+                        let typed = Lit::TypedLit(ts.to_string(), Type::TimestampType);
+                        return Ok(ast::Expr::Lit(ctx.node(typed)));
+                    }
+                    *input = checkpoint;
+                }
                 return self.literal_strategies[5].parse(input, ctx); // NumericLiteralStrategy
             }
             Some(b'[') => {
@@ -139,6 +155,24 @@ impl PrimaryStrategy {
         parse_identifier_or_call(input, ctx)
     }
 
+}
+
+/// Cheap structural check before invoking the full Ion timestamp parser.
+///
+/// An Ion timestamp expression always starts with four ASCII digits
+/// followed by either `T` (year-only, e.g. `2024T`) or `-` (year-month or
+/// longer). Anything else — `2024`, `2024.0`, `2024 - 1`, `2024 + foo` —
+/// must remain a numeric literal / arithmetic expression.
+#[inline]
+fn looks_like_ion_timestamp(input: &str) -> bool {
+    let bytes = input.as_bytes();
+    if bytes.len() < 5 {
+        return false;
+    }
+    if !bytes[0..4].iter().all(|b| b.is_ascii_digit()) {
+        return false;
+    }
+    matches!(bytes[4], b'T' | b'-')
 }
 
 fn parse_paren_expr<'a>(input: &mut &'a str, ctx: &StrategyContext<'_>) -> PResult<ast::Expr> {
@@ -602,6 +636,76 @@ mod tests {
         match &e {
             ast::Expr::Call(_) => { /* parser accepted it */ }
             other => panic!("expected Call, got {:?}", other),
+        }
+    }
+
+    /// Bare Ion timestamp `2024-01-01T10:00:00Z` (no backticks) appearing in
+    /// expression position must produce a `TypedLit(s, TimestampType)`. This
+    /// is the Ion-text shape used inside struct fields, e.g.
+    /// `INSERT INTO t << { 'start': 2024-01-01T10:00:00Z } >>`.
+    /// The parser must distinguish it from a binary subtraction `2024 - 01`.
+    #[test]
+    fn test_bare_ion_timestamp_full() {
+        let e = parse("2024-01-01T10:00:00Z");
+        match &e {
+            ast::Expr::Lit(n) => match &n.node {
+                Lit::TypedLit(s, ast::Type::TimestampType) => {
+                    assert_eq!(s, "2024-01-01T10:00:00Z");
+                }
+                other => panic!("expected TypedLit(_, TimestampType), got {:?}", other),
+            },
+            other => panic!("expected Lit, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_bare_ion_timestamp_year_only() {
+        let e = parse("2024T");
+        match &e {
+            ast::Expr::Lit(n) => match &n.node {
+                Lit::TypedLit(s, ast::Type::TimestampType) => assert_eq!(s, "2024T"),
+                other => panic!("expected TypedLit, got {:?}", other),
+            },
+            other => panic!("expected Lit, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_bare_ion_timestamp_with_offset() {
+        let e = parse("2024-01-15T12:30:00+05:30");
+        match &e {
+            ast::Expr::Lit(n) => match &n.node {
+                Lit::TypedLit(s, ast::Type::TimestampType) => {
+                    assert_eq!(s, "2024-01-15T12:30:00+05:30");
+                }
+                other => panic!("expected TypedLit, got {:?}", other),
+            },
+            other => panic!("expected Lit, got {:?}", other),
+        }
+    }
+
+    /// Plain integers must still be integers — the timestamp dispatch must
+    /// not regress numeric parsing.
+    #[test]
+    fn test_integer_not_misread_as_timestamp() {
+        let e = parse("2024");
+        match &e {
+            ast::Expr::Lit(n) => match &n.node {
+                Lit::Int64Lit(2024) => { /* ok */ }
+                other => panic!("expected Int64Lit(2024), got {:?}", other),
+            },
+            other => panic!("expected Lit, got {:?}", other),
+        }
+    }
+
+    /// Subtraction must still parse normally — `2024 - 1` must be a BinOp,
+    /// not be greedily eaten by the timestamp parser.
+    #[test]
+    fn test_subtraction_not_misread_as_timestamp() {
+        let e = parse("2024 - 1");
+        match &e {
+            ast::Expr::BinOp(n) => assert_eq!(n.node.kind, ast::BinOpKind::Sub),
+            other => panic!("expected BinOp(Sub), got {:?}", other),
         }
     }
 
