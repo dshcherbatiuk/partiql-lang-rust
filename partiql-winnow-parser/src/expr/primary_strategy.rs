@@ -410,6 +410,42 @@ mod tests {
         ));
     }
 
+    /// Negative integer literals are parsed as `UniOp(Neg, Int64Lit(n))`
+    /// (LALRPOP behaves the same way). Downstream consumers — the logical
+    /// planner / evaluator — fold this at runtime via `EvalOpUnary::Neg`.
+    /// Any AST→value direct conversion (e.g. FDE's Ion-native DML path)
+    /// must therefore handle the unfolded `UniOp(Neg, Lit)` shape.
+    #[test]
+    fn test_negative_integer_literal() {
+        let e = parse("-1");
+        match &e {
+            ast::Expr::UniOp(n) => {
+                assert_eq!(n.node.kind, ast::UniOpKind::Neg);
+                match &*n.node.expr {
+                    ast::Expr::Lit(lit) => assert!(
+                        matches!(lit.node, Lit::Int64Lit(1)),
+                        "expected Int64Lit(1), got {:?}",
+                        lit.node
+                    ),
+                    other => panic!("expected Lit inside UniOp, got {:?}", other),
+                }
+            }
+            other => panic!("expected UniOp(Neg, Lit), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_negative_decimal_literal() {
+        let e = parse("-3.14");
+        match &e {
+            ast::Expr::UniOp(n) => {
+                assert_eq!(n.node.kind, ast::UniOpKind::Neg);
+                assert!(matches!(*n.node.expr, ast::Expr::Lit(_)));
+            }
+            other => panic!("expected UniOp(Neg, Lit), got {:?}", other),
+        }
+    }
+
     #[test]
     fn test_path_dot() {
         let e = parse("a.b");
