@@ -1,6 +1,6 @@
 # Winnow Parser Benchmark Report
 
-## Date: 2026-04-09 (v5 — single-pass DML, Ion-native FDE)
+## Date: 2026-04-11 (v6 — parser feature coverage)
 
 ## Environment
 - Apple Silicon (aarch64-apple-darwin)
@@ -26,6 +26,24 @@
 
 **Average speedup vs LALRPOP: 3.5x**
 
+## v6 — Parser feature coverage (SELECT)
+
+These benches pin the parser features added in v6 — each one was a
+gap that broke real downstream tests until the matching commit landed
+on `feature/winnow-parser`. They double as a perf budget for the new
+code paths and a regression smoke test (criterion fails if the parser
+stops accepting them).
+
+| Bench | Median time | Pinned feature |
+|---|---:|---|
+| `alias_inference_path_projection` | **1.04 µs** | `u.id`, `u.name` round-trip with `VarRef`-shaped path steps so the column-name aliases survive lowering. |
+| `path_unpivot_star` | **938 ns** | `SELECT DISTINCT u.*` — `PathStep::PathUnpivot`. |
+| `path_for_each_bracket_star` | **431 ns** | `a[*]` — `PathStep::PathForEach`. |
+| `backtick_ion_literal_in_function` | **494 ns** | `UNIX_TIMESTAMP(\`2020T\`)` — backtick-delimited Ion literal as expression. |
+| `backtick_ion_literal_with_offset` | **479 ns** | `UNIX_TIMESTAMP(\`2024-01-01T10:00:00.500Z\`)` — full ISO 8601 inside backticks. |
+| `bare_ion_timestamp_compare` | **482 ns** | `WHERE created_at > 2024-01-01T00:00:00Z` — bare Ion timestamp wired into `PrimaryStrategy`. |
+| `negative_int_literal_compare` | **446 ns** | `WHERE version > -1` — `UniOp(Neg, Int64Lit(1))` parser shape pinned for downstream consumers that bypass the evaluator. |
+
 ## DML Queries — Winnow (all versions)
 
 | Query | v3 (byte-level) | v4 (Pratt) | v5 (current) | Improvement |
@@ -40,6 +58,16 @@
 | `DELETE FROM "fde.users" WHERE email = 'test@co'` | 542ns | 317ns | **166ns** | **3.3x** |
 
 **v5 DML average improvement vs v3: 3.8x**
+
+## v6 — Parser feature coverage (DML)
+
+| Bench | Median time | Pinned feature |
+|---|---:|---|
+| `insert_negative_int` | **321 ns** | `'version': -1` — `UniOp(Neg, Int64Lit(1))` shape (folded by FDE's value conversion). |
+| `insert_decimal_literal` | **302 ns** | `'realValue': 8.8` — `Lit::DecimalLit` produced by the unsigned-decimal grammar branch. |
+| `insert_bare_ion_timestamp` | **348 ns** | `'start': 2024-01-01T10:00:00Z` — bare Ion timestamp inside DML, dispatched ahead of the numeric literal strategy. |
+| `insert_ion_blob_literal` | **325 ns** | `'payload': {{dGVzdCBkYXRh}}` — Ion blob literal `{{ base64 }}` in `literal/ion/blob.rs`. |
+| `delete_aliased_path_where` | **250 ns** | `DELETE FROM "msteams.users" u WHERE u.id = '1'` — exercises the path-aware field reference shape that downstream WHERE-extraction depends on. |
 
 ## ON CONFLICT Queries — Winnow
 
@@ -86,6 +114,13 @@ Slight regression in ON CONFLICT (3-15%) — `OnConflictParser::new()` allocatio
 20. **DML handlers single-pass** — convert AST→Ion bytes inline, no intermediate Vec<Value>
 21. **AST→Ion direct path** — INSERT/REPLACE bypass PartiQL Value entirely on write
 
+### Phase 6 (parser feature coverage)
+22. **VarRef-shaped path projections** — `.field` produces `PathProject(VarRef("field"))` instead of `Lit::CharStringLit`, so `name_resolver::infer_alias` can recover the projection alias.
+23. **PathUnpivot `.*` and PathForEach `[*]`** — added to the postfix loop in `try_postfix`.
+24. **Backtick-delimited Ion literal** — `` `2020T` ``, ` ```a`b``` `, etc., parsed in `PrimaryStrategy::parse_primary` to `Lit::EmbeddedDocLit` (matching LALRPOP).
+25. **Bare Ion timestamp in expression position** — `2024-01-01T10:00:00Z` dispatched before the numeric strategy via a cheap `looks_like_ion_timestamp` structural check; `ion_timestamp` helper is now wired.
+26. **Ion blob literal `{{ base64 }}`** — new `literal/ion/blob.rs` module, dispatched on `b'{'` + peek of next byte for `b'{'`. Whitespace inside the delimiters is permitted and stripped before producing `Lit::TypedLit(payload, BlobType)`.
+
 ## Benchmark History
 
 | Version | Avg Speedup vs LALRPOP | Key Change |
@@ -95,7 +130,8 @@ Slight regression in ON CONFLICT (3-15%) — `OnConflictParser::new()` allocatio
 | v3 (byte-level) | 2.0-2.4x | Byte-level kw(), Cell IDs, inline ASCII whitespace |
 | v4 (Pratt + FDE) | 2.8-4.1x | Pratt parser, ParsedDql, partiql-parser removed |
 | v5 (Ion-native) | **2.9-4.2x** | Single-pass DML, AST→Ion direct, DmlQueryParser::default |
+| v6 (feature coverage) | **2.9-4.2x** | PathUnpivot/ForEach, backtick + bare Ion timestamps, Ion blob literal, VarRef-shaped path projections |
 
 ## Methodology
 
-Benchmark runs Criterion with 100 samples, 3s warmup per query. Both parsers produce the same `partiql-ast` AST types, verified by 16 parity tests comparing structural properties.
+Benchmark runs Criterion with 100 samples, 3s warmup per query. Both parsers produce the same `partiql-ast` AST types, verified by 17 parity tests comparing structural properties.
