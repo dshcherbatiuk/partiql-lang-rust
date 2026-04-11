@@ -18,7 +18,8 @@
 
 use partiql_ast::ast;
 use partiql_ast::ast::{
-    Call, CallAgg, CallArg, CaseSensitivity, ScopeQualifier, SymbolPrimitive, VarRef,
+    Call, CallAgg, CallArg, CaseSensitivity, CustomType, CustomTypePart, Lit, ScopeQualifier,
+    SymbolPrimitive, Type, VarRef,
 };
 use winnow::prelude::*;
 
@@ -98,6 +99,10 @@ impl PrimaryStrategy {
                 // Double-quoted = case-sensitive identifier
                 return parse_identifier_or_call(input, ctx);
             }
+            Some(b'`') => {
+                // Backtick-delimited embedded Ion literal: `2020T`, ```a`b```, ...
+                return parse_embedded_doc_literal(input, ctx);
+            }
             _ => {}
         }
 
@@ -143,6 +148,78 @@ fn parse_paren_expr<'a>(input: &mut &'a str, ctx: &StrategyContext<'_>) -> PResu
     let _ = ws0(input);
     let _ = ')'.parse_next(input)?;
     Ok(inner)
+}
+
+/// Parse a backtick-delimited embedded Ion literal.
+///
+/// Embedded values are wrapped in a matching odd-numbered run of backticks
+/// (e.g. `` `foo` ``, ```` ```foo``` ````, ``` `````foo````` ```), so that
+/// the embedded content itself can contain backticks shorter than the
+/// delimiter run. The result is `Lit::EmbeddedDocLit(content, Type::Ion)` —
+/// the same shape the LALRPOP parser produces, so the logical planner can
+/// lower both consistently.
+fn parse_embedded_doc_literal<'a>(
+    input: &mut &'a str,
+    ctx: &StrategyContext<'_>,
+) -> PResult<ast::Expr> {
+    let bytes = input.as_bytes();
+
+    // Count the leading run of backticks; must be odd.
+    let mut open_len = 0usize;
+    while open_len < bytes.len() && bytes[open_len] == b'`' {
+        open_len += 1;
+    }
+    if open_len == 0 || open_len % 2 == 0 {
+        return Err(winnow::error::ErrMode::Backtrack(
+            winnow::error::ContextError::new(),
+        ));
+    }
+
+    // Scan for a matching closing run of backticks of length >= open_len.
+    // We greedily prefer the longest run starting at the candidate position
+    // (matching LALRPOP's lexer behavior).
+    let mut i = open_len;
+    let close_start;
+    let close_len;
+    loop {
+        if i >= bytes.len() {
+            return Err(winnow::error::ErrMode::Backtrack(
+                winnow::error::ContextError::new(),
+            ));
+        }
+        if bytes[i] == b'`' {
+            let mut j = i;
+            while j < bytes.len() && bytes[j] == b'`' {
+                j += 1;
+            }
+            let run_len = j - i;
+            if run_len >= open_len {
+                // Use the leading `open_len` of this run as the closer; any
+                // remaining backticks belong to the next token.
+                close_start = i;
+                close_len = open_len;
+                break;
+            }
+            i = j;
+            continue;
+        }
+        i += 1;
+    }
+
+    let content = &input[open_len..close_start];
+    let consumed_end = close_start + close_len;
+    *input = &input[consumed_end..];
+
+    let ion_typ = Type::CustomType(CustomType {
+        parts: vec![CustomTypePart::Name(SymbolPrimitive {
+            value: "Ion".to_string(),
+            case: CaseSensitivity::CaseInsensitive,
+        })],
+    });
+
+    Ok(ast::Expr::Lit(
+        ctx.node(Lit::EmbeddedDocLit(content.to_string(), ion_typ)),
+    ))
 }
 
 /// Parse identifier — if followed by `(`, parse as function call.
@@ -484,6 +561,47 @@ mod tests {
                 assert!(matches!(p.node.steps[0], ast::PathStep::PathForEach));
             }
             other => panic!("expected Path with PathForEach step, got {:?}", other),
+        }
+    }
+
+    /// Backtick-delimited Ion literal: `` `2020T` `` produces an
+    /// `EmbeddedDocLit` whose payload is the bare Ion text. The logical
+    /// planner lowers this to `logical::Lit::Variant(bytes, "Ion")`,
+    /// matching the LALRPOP parser shape exactly. Used for Ion timestamp
+    /// literals as arguments to functions like `UNIX_TIMESTAMP(`2020T`)`.
+    #[test]
+    fn test_backtick_ion_literal_timestamp() {
+        let e = parse("`2020T`");
+        match &e {
+            ast::Expr::Lit(n) => match &n.node {
+                Lit::EmbeddedDocLit(s, _) => assert_eq!(s, "2020T"),
+                other => panic!("expected EmbeddedDocLit, got {:?}", other),
+            },
+            other => panic!("expected Lit, got {:?}", other),
+        }
+    }
+
+    /// Triple-backtick form lets the embedded content contain single backticks.
+    #[test]
+    fn test_backtick_ion_literal_triple_quoted() {
+        let e = parse("```a`b```");
+        match &e {
+            ast::Expr::Lit(n) => match &n.node {
+                Lit::EmbeddedDocLit(s, _) => assert_eq!(s, "a`b"),
+                other => panic!("expected EmbeddedDocLit, got {:?}", other),
+            },
+            other => panic!("expected Lit, got {:?}", other),
+        }
+    }
+
+    /// Backtick literals must be usable as function arguments — the original
+    /// motivating case is `UNIX_TIMESTAMP(`2020T`)`.
+    #[test]
+    fn test_backtick_ion_literal_in_function_call() {
+        let e = parse("UNIX_TIMESTAMP(`2020T`)");
+        match &e {
+            ast::Expr::Call(_) => { /* parser accepted it */ }
+            other => panic!("expected Call, got {:?}", other),
         }
     }
 
