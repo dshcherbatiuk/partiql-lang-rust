@@ -27,6 +27,7 @@ use super::StrategyContext;
 use crate::identifier;
 use crate::keyword::ch;
 use crate::literal::bag_strategy::BagConstructorStrategy;
+use crate::literal::ion::blob::ion_blob_payload;
 use crate::literal::ion::timestamp::ion_timestamp;
 use crate::literal::boolean_strategy::BooleanLiteralStrategy;
 use crate::literal::case_strategy::CaseExprStrategy;
@@ -98,6 +99,13 @@ impl PrimaryStrategy {
                 return self.literal_strategies[1].parse(input, ctx); // ListConstructorStrategy
             }
             Some(b'{') => {
+                // `{{...}}` is an Ion blob literal — must beat struct dispatch.
+                if input.as_bytes().get(1) == Some(&b'{') {
+                    let payload = ion_blob_payload(input)?;
+                    return Ok(ast::Expr::Lit(
+                        ctx.node(Lit::TypedLit(payload, Type::BlobType)),
+                    ));
+                }
                 return self.literal_strategies[2].parse(input, ctx); // StructConstructorStrategy
             }
             Some(b'(') => {
@@ -707,6 +715,45 @@ mod tests {
             ast::Expr::BinOp(n) => assert_eq!(n.node.kind, ast::BinOpKind::Sub),
             other => panic!("expected BinOp(Sub), got {:?}", other),
         }
+    }
+
+    /// Ion blob literal `{{ base64 }}` — bare double-curly form. Produces
+    /// `Lit::TypedLit(base64_payload, BlobType)`. Whitespace inside the
+    /// delimiters is permitted (and stripped).
+    #[test]
+    fn test_ion_blob_literal_basic() {
+        let e = parse("{{dGVzdCBkYXRh}}");
+        match &e {
+            ast::Expr::Lit(n) => match &n.node {
+                Lit::TypedLit(s, ast::Type::BlobType) => assert_eq!(s, "dGVzdCBkYXRh"),
+                other => panic!("expected TypedLit(_, BlobType), got {:?}", other),
+            },
+            other => panic!("expected Lit, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_ion_blob_literal_with_whitespace() {
+        let e = parse("{{  dGVzdCBkYXRh  }}");
+        match &e {
+            ast::Expr::Lit(n) => match &n.node {
+                Lit::TypedLit(s, ast::Type::BlobType) => assert_eq!(s, "dGVzdCBkYXRh"),
+                other => panic!("expected TypedLit, got {:?}", other),
+            },
+            other => panic!("expected Lit, got {:?}", other),
+        }
+    }
+
+    /// Single curly `{` must still dispatch to struct construction —
+    /// the blob fast-path must not regress that.
+    #[test]
+    fn test_single_curly_still_struct() {
+        let e = parse("{'name': 1}");
+        assert!(
+            matches!(&e, ast::Expr::Struct(_)),
+            "single `{{` should still parse as a struct, got {:?}",
+            e
+        );
     }
 
     #[test]
