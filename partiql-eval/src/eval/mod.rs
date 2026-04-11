@@ -14,6 +14,9 @@ use partiql_value::{BindingsName, Value};
 
 use crate::env::basic::MapBindings;
 
+pub mod bindings_scan;
+pub use bindings_scan::BindingsScan;
+
 pub mod coll_count;
 pub use coll_count::CollCount;
 
@@ -185,6 +188,16 @@ pub trait EvalContext: Bindings<Value> + SessionContext + Debug {
     /// Returns a [`CollCount`] implementation if the storage engine supports
     /// aggregate pushdown for COUNT. Default: `None` — evaluator iterates.
     fn as_coll_count(&self) -> Option<&dyn CollCount> {
+        None
+    }
+
+    /// Returns a [`BindingsScan`] implementation if the storage engine
+    /// exposes top-level tables as lazy iterators. Default: `None` —
+    /// evaluator falls back to the eager `Bindings<Value>::get` lookup
+    /// against `MapBindings`. The `TableScan` operator (added in
+    /// `partiql-eval` Phase 1C — see ADR-009 in the FDE repository)
+    /// checks this before allocating a materialised `Value::Bag`.
+    fn bindings_scan(&self) -> Option<&dyn BindingsScan> {
         None
     }
 }
